@@ -2,8 +2,6 @@
 #include <sys/cdefs.h>
 #include "_syscalls_impl.h"
 
-// --oslib=myos
-/* Picolibc part */
 static int simulated_putc(char c, FILE *file)
 {
     int written;
