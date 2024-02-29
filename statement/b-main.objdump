@@ -1,0 +1,24 @@
+
+b.elf:     file format elf32-i386
+
+
+Disassembly of section .text:
+
+40030000 <main>:
+40030000:	53                   	push   %ebx
+40030001:	e8 28 00 00 00       	call   4003002e <__x86.get_pc_thunk.bx>
+			40030002: R_386_PC32	__x86.get_pc_thunk.bx
+40030006:	81 c3 8e 1e 00 00    	add    $0x1e8e,%ebx
+			40030008: R_386_GOTPC	_GLOBAL_OFFSET_TABLE_
+4003000c:	68 db 0f 49 40       	push   $0x40490fdb
+40030011:	68 00 00 00 20       	push   $0x20000000
+40030016:	6a 00                	push   $0x0
+40030018:	8d 83 dc ff ff ff    	lea    -0x24(%ebx),%eax
+			4003001a: R_386_GOTOFF	.LC0
+4003001e:	50                   	push   %eax
+4003001f:	e8 33 01 00 00       	call   40030157 <printf>
+			40030020: R_386_PLT32	printf
+40030024:	83 c4 10             	add    $0x10,%esp
+40030027:	b8 21 00 00 00       	mov    $0x21,%eax
+4003002c:	5b                   	pop    %ebx
+4003002d:	c3                   	ret
