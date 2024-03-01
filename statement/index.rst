@@ -20,12 +20,17 @@ Materiały dodatkowe
 
 TBA
 
+
 Przykładowe pliki przed usunięciem symboli:
 
 - :download:`a.elf`
 - :download:`b.elf`
 
 Skrypt linkera: :download:`picolibc.ld`.
+
+Więcej szczegółów można znaleźć w
+`repozytorium  z materiałami do zadania <https://gitlab.uw.edu.pl/zso/2024z/zad1_public>`_.
+Aby mieć do niego dostęp, wystarczy zalogować się przez CAS.
 
 
 Wprowadzenie
@@ -307,7 +312,7 @@ Sam Makefile może delegować budowanie do dowolnego innego systemu budowania b�
 
 Rozwiązanie prosimy przesłać w formie paczki na adres ``m.matraszek@mimuw.edu.pl`` z CC do ``a.jackowski@mimuw.edu.pl`` oraz ``w.ciszewski@mimuw.edu.pl``.
 Spróbujemy umożliwić eksperymentalne oddawanie rozwiązań poprzez wydziałowy GitLab, który automatycznie weryfikowałby testy oraz ułatwi proces oceny kodu.
-
+(Proszę nie robić MR do bazowego repozytorium z materiałami, ponieważ to upubliczni rozwiązanie.)
 
 
 Wskazówki

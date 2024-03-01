@@ -31,11 +31,11 @@ Pozostałe przydatne cele make (na przykładzie programu a):
 ``examples/a.elf``
     Kompiluje tylko program ``a``.
 ``run-a``
-    Uruchamia program ``a`` z przykładowym wejściem an stdin.
+    Uruchamia program ``a`` z przykładowym wejściem na stdin.
 ``examples/a.strip``
-    Tworzy bazy plik, który będzie wejściem dla ``./symbolize``.
+    Tworzy bazowy plik, który będzie wejściem dla ``./symbolize``.
 ``examples/a.flash``
-    Tworzy plik przypominający obrazów Flasha dla Quarka.
+    Tworzy plik przypominający obraz Flasha dla Quarka.
 ``examples/a-objdump``
     Pokazuje ładnie zdeasemblowany plik ``a.elf``.
     Co więcej, uruchamiając przez ``make examples/a-objdump  WITH_SYMBOLS=1`` pokaże relokacje, symbole i inne informacje.
