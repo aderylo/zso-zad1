@@ -40,6 +40,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+extern char __stack[];
 extern char __data_source[];
 extern char __data_start[];
 extern char __data_end[];
@@ -83,42 +84,26 @@ extern void __libc_init_array(void);
 #define CONSTRUCTORS 1
 #endif
 
-void __attribute__((section(".text.init.enter")))
-_start(void)
+asm (
+        ".text\n"
+        ".section .text.init.enter\n"
+        ".globl _start\n"
+        ".type _start, @function\n"
+        "_start:\n"
+        "popl %eax\n" // argc according to SYSV ABI
+        "movl %esp, %edx\n" // argv according to SYSV ABI
+        "mov $__stack, %esp\n"
+        "xor %ebp, %ebp\n"
+        "jmp __start\n"
+);
+
+
+static void __attribute__((section(".text.init.enter"), noreturn, used))
+__start(int argc, char** argv)
 {
 //	memcpy(__data_start, __data_source, (uintptr_t) __data_size);
 	memset(__bss_start, '\0', (uintptr_t) __bss_size);
 	__libc_init_array();
-
-#ifdef CRT0_SEMIHOST
-#define CMDLINE_LEN     1024
-#define ARGV_LEN        64
-        static char cmdline[CMDLINE_LEN];
-        static char *argv[ARGV_LEN];
-        int argc = 0;
-
-        if (sys_semihost_get_cmdline(cmdline, sizeof(cmdline)) == 0 &&
-            cmdline[0])
-        {
-            char *c = cmdline;
-
-            while (*c && argc < ARGV_LEN - 1) {
-                argv[argc++] = c;
-                while (*c && *c != ' ')
-                    c++;
-                if (!*c)
-                    break;
-                *c = '\0';
-                while (*++c == ' ')
-                    ;
-            }
-        } else
-            argv[argc++] = "program-name";
-        argv[argc] = NULL;
-#else
-#define argv NULL
-#define argc 0
-#endif
 
 	int ret = main(argc, argv);
 	exit(ret);

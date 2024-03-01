@@ -100,6 +100,7 @@ $(stdlib_targets:elf=part): %.part: picolibc/crt0.o picolibc/picolibc_syscalls.o
 
 # Syntax for changing depf of only one file
 examples/b.o: CFLAGS += -Wno-format # picolibc's doing a weird trick
+picolibc/crt0.o: CFLAGS += -fno-pic -fno-plt
 
 
 %.elf: %.part
@@ -130,6 +131,8 @@ examples/b.o: CFLAGS += -Wno-format # picolibc's doing a weird trick
 	-i386 ./$< < $(<:elf=input)
 
 # Helpful for IDEs to click
+examples/a.elf:
+examples/b.elf:
 run-a: examples/a-run
 run-b: examples/b-run
 
@@ -159,3 +162,5 @@ build-picolibc:
 		picolibc/meson-build picolibc/_repo
 
 	cd picolibc/meson-build && ninja && ninja install
+	@echo Patching the linker script to make Linux always allocate the whole simulated SRAM for us.
+	sed -i picolibc/iamcu/lib/picolibc.ld -e '/\.stack (NOLOAD)/ a . += __heap_size - (DEFINED(__heap_size_min) ? __heap_size_min : 0);'

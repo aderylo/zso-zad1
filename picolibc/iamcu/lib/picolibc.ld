@@ -276,6 +276,7 @@ SECTIONS
 
 	/* Define a stack region to make sure it fits in memory */
 	.stack (NOLOAD) : {
+. += __heap_size - (DEFINED(__heap_size_min) ? __heap_size_min : 0);
 		. += (DEFINED(__stack_size) ? __stack_size : 0x00001000);
 	} >ram :ram
 
