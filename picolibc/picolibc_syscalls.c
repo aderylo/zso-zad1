@@ -2,6 +2,10 @@
 #include <sys/cdefs.h>
 #include "_syscalls_impl.h"
 
+clock_t clock() {
+    return rdtsc();
+}
+
 static int simulated_putc(char c, FILE *file)
 {
     int written;

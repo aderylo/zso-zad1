@@ -12,6 +12,7 @@ typedef char(*pfunc)(char);
 const pfunc ARR[2] = {putc, putc_err};
 
 static int FOO = 1;
+int int_arr[10] = {};
 
 void foo() {
     pfunc arr[2] = {putc, putc_err};
@@ -34,7 +35,9 @@ int main() {
             putc_err('O');
             putc_err('F');
             _exit(1);
-        case 0 ... 5: putc('h');
+        case 0 ... 5:
+            putc('h');
+            int_arr[a] = 0x42;
         case ' '+1 ...'a': _exit(33);
         case 'b': return 20;
         default: break;

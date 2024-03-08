@@ -18,9 +18,12 @@ Wykonując ``make run-a run-b`` możemy skompilować i uruchomić przykładowe p
 
 W katalogu ``picolibc`` znajduje się skompilowana wersja biblioteki standardowej, submoduł źródłowy oraz wymagany klej.
 
-W katalogu ``examples`` znajdziemy dwa przykładowe programy testowe.
+W katalogu ``examples`` znajdziemy kilka przykładowych programów testowych.
 Program ``a`` jest samodzielny: nie jest linkowany z biblioteką standardową.
 Program ``b`` pokazuje przykładową interakcję z picolibc.
+Programy ``min_*`` pokazuje minimalne programy wykorzystujące dane funkcjonalności.
+Program ``tricky`` pokazuje potencjalnie nietrywialne sytuacje, które może napotkać program.
+Program ``iotbench`` pokazuje przykładową dużą aplikację.
 
 W pliku ``examples/_io_impl.c`` znajduje się prosta implementacja wejścia/wyjścia dla naszego udawanego mikrokontrolera.
 
@@ -43,3 +46,9 @@ Pozostałe przydatne cele make (na przykładzie programu a):
     Tak samo jak ``run-a``, ale nie jest zahardkodowanym skrótem.
 
 Ponadto, uruchamiając ``make build-picolibc`` możemy przekompilować używaną bibliotekę standardową.
+
+Dodatkowe źródła testów
+-----------------------
+
+Poza typowymi programami, warto spojrzeć również na testy samego linkera,
+które możemy znaleźć tutaj: https://github.com/bminor/binutils-gdb/tree/master/ld/testsuite/ld-i386

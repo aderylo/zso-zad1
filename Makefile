@@ -18,40 +18,44 @@ CFLAGS += -Iinclude/
 #CFLAGS += -Wall -Wextra -Werror
 CFLAGS +=  -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-exceptions
 CFLAGS += -ffunction-sections -fdata-sections
-CFLAGS += -march=lakemont -mtune=lakemont -m32 -miamcu #-msoft-float
+CFLAGS += -march=lakemont -mtune=lakemont -m32 -miamcu -msoft-float
 CFLAGS += -nostdlib -fno-builtin -mno-default # -nostdinc -- needed for <float.h>
-CFLAGS += -static
+#CFLAGS += -static
+# Disable GOT32X relocation.
+CFLAGS += -Wa,-mrelax-relocations=no
+CFLAGS += -Wl,--no-relax
 
+NO_PLT = -fno-plt
 SIMPLE_PIC = -fno-plt -fpic -fno-jump-tables
 NOTHING = -fno-pic -fno-pie -fno-plt -fno-jump-tables
-#CFLAGS +=  -fno-plt
-#CFLAGS +=  -fno-shrink-wrap
 #-static-pie, -pie
 
 
 LDFLAGS += $(CFLAGS)
-#LDFLAGS += -static
 
+# Maybe we won't use this for rebuilding!
 LATE_LDFLAGS += -Wl,--gc-sections
 LDFLAGS += -Wl,--emit-relocs
-#LDFLAGS += -nolibc
 LDFLAGS += -Wl,--build-id=none
+LDFLAGS += -Wl,--no-warn-rwx-segments
 
-#LDLIBS += -lc -lnosys -lsoftfp -lgcc
-#LDFLAGS += -static -pie
-LDFLAGS += -Wl,--no-dynamic-linker
-#LDFLAGS += -Wl,-z,text,-z,norelro
+LDFLAGS_FOR_PLT += -Wl,--dynamic-linker=
+LDFLAGS_FOR_PLT += -Wl,-znorelro,-ztextoff
+
+LDFLAGS_FOR_STATIC += -Wl,-znorelro,-ztext
 
 
 PICOLIBC := picolibc/iamcu
 #LATE_LDFLAGS += -T quarkish.ld
 LATE_LDFLAGS += -T $(PICOLIBC)/lib/picolibc.ld
 
-#BUILD ?= debug
-BUILD ?= release
+BUILD ?= debug
+#BUILD ?= release
 
 ifeq ($(BUILD), debug)
-CFLAGS += -O0 -g -DDEBUG
+CFLAGS += -O0
+#CFLAGS += -g -DDEBUG
+CFLAGS += -g0 -DDEBUG
 LDFLAGS += -Wl,--strip-debug
 else ifeq ($(BUILD), release)
 CFLAGS += -Os -fomit-frame-pointer
@@ -81,26 +85,51 @@ endif
 TARGET ?= all
 
 
-raw_targets := examples/a.elf
-stdlib_targets := examples/b.elf
+raw_targets := $(addprefix examples/, a.elf min.elf min_got.elf min_got_harder.elf min_plt.elf)
+stdlib_targets := $(addprefix examples/, b.elf min_libc.elf min_libc_plt.elf min_libc_constructors.elf tricky.elf iotbench.elf)
+all_targets := $(raw_targets) $(stdlib_targets)
 
-all: $(stdlib_targets) $(raw_targets)
+plt_targets := examples/min_plt.elf examples/min_libc_plt.elf
+#plt_targets += examples/b.elf examples/min_libc.elf examples/tricky.elf
+static_targets := $(filter-out $(plt_targets), $(all_targets))
+
+all: $(all_targets)
 
 # This syntax updates the var only for matching targets (and dependents)
-$(stdlib_targets): LIBRARIES += -lc
+$(stdlib_targets): LIBRARIES += -lc -lm -lgcc
 $(stdlib_targets): CFLAGS += -I$(PICOLIBC)/include  -L$(PICOLIBC)/lib
+
+ifeq (${BINUTILS_PREFIX}, x86_64-linux-gnu-)
+# If not a proper cross-compilation.
+# The default libgcc is either not present or compiled without softfloat (gcc-10-multilib).
+$(stdlib_targets): CFLAGS += -Lpicolibc/iamcu-but-i386
+endif
 #$(stdlib_targets): LDFLAGS += -specs=picolibc.specs
+
+$(static_targets): CFLAGS += -static
+$(static_targets): LDFLAGS += $(LDFLAGS_FOR_STATIC)
+$(plt_targets): LDFLAGS += $(LDFLAGS_FOR_PLT)
 
 # This syntax adds dependencies for entries matching the pattern
 # $(var:pat=repl) is a replacement syntax
 $(stdlib_targets:elf=part) $(raw_targets:elf=part): %.part: examples/_io_impl.o
 $(stdlib_targets:elf=part): %.part: picolibc/crt0.o picolibc/picolibc_syscalls.o
 
-#$(stdlib_targets:.elf=-objdump): OBJDUMP_FLAGS += --source
+examples/tricky.part: examples/tricky_part1.o
+examples/iotbench.part: $(addprefix examples/IoTBench/, $(addsuffix .o, main list_search_sort conv matrix))
 
-# Syntax for changing depf of only one file
+# Syntax for changing dep/vars of only one file
 examples/b.o: CFLAGS += -Wno-format # picolibc's doing a weird trick
-picolibc/crt0.o: CFLAGS += -fno-pic -fno-plt
+
+# Try mix-and-match various flags for various examples
+examples/a.part: CFLAGS += $(NOTHING)
+#examples/a.part: CFLAGS += $(NO_PLT)
+examples/b.part: CFLAGS += $(NO_PLT)
+
+#picolibc/crt0.o: CFLAGS += -fno-pic -fno-plt
+examples/mi%.part: CFLAGS += -Os
+
+#examples/tricky.elf: CFLAGS += -DFULL_TEST_VERSION
 
 
 %.elf: %.part
@@ -108,7 +137,7 @@ picolibc/crt0.o: CFLAGS += -fno-pic -fno-plt
 
 # Note: this is not to be always assumed!
 %.part: %.o
-	$(LD) $(LDFLAGS) -Wl,-\( $(filter %.o, $^) $(LIBRARIES) -Wl,-\) -o $@ -r
+	$(LD) $(LDFLAGS)  -Wl,-\( $(filter %.o, $^) $(LIBRARIES) -Wl,-\) -o $@ -r -Wl,-e,_start -Wl,--gc-sections
 
 %.o: %.S Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -119,6 +148,7 @@ picolibc/crt0.o: CFLAGS += -fno-pic -fno-plt
 %.flash: %.elf
 	$(OBJCOPY) $(OBJCOPY_FLAGS) $< $@
 
+
 %.strip: %.elf
 	# Not present in my objcopy?
 	#$(OBJCOPY) --strip-all --enable-deterministic-archives  --strip-section-headers $< $@
@@ -128,11 +158,13 @@ picolibc/crt0.o: CFLAGS += -fno-pic -fno-plt
 	$(OBJDUMP) $(OBJDUMP_FLAGS) $<
 
 %-run: %.elf
-	-i386 ./$< < $(<:elf=input)
+	-i386 ./$< <$(if $(wildcard $(<:elf=input)), $(<:elf=input), /dev/null)
 
 # Helpful for IDEs to click
 examples/a.elf:
 examples/b.elf:
+examples/min_got_harder.elf:
+examples/tricky.elf:
 run-a: examples/a-run
 run-b: examples/b-run
 
