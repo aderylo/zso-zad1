@@ -1,12 +1,14 @@
 [binaries]
 c = ['ccache', 'x86_64-linux-gnu-gcc-10',
-# are we sure we want these?
-    '-fno-pic', '-fno-PIE', '-static', '-nostdlib',
+# TODO: built two versions
+    '-fno-pic', '-fno-PIE', '-static',
+     '-nostdlib',
     '-fno-unwind-tables', '-fno-asynchronous-unwind-tables', '-fno-exceptions',
     #'-ffunction-sections', '-fdata-sections',
     '-m32',  '-miamcu', '-march=lakemont', '-mtune=lakemont',  '-msoft-float',
     '-Wl,--emit-relocs',
     '-O0', '-g',
+    '-Wa,-mrelax-relocations=no', '-Wl,--no-relax', # We don't like GOT32X!
 # TODO: support other builds:
     #'-Os', '-fomit-frame-pointer',
     #'-flto',
