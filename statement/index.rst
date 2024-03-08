@@ -172,14 +172,17 @@ Wytyczne
 
     -  W ramach rosnącej trudności, relokacje:
 
-       - ``R_386_32``, ``R_386_PC32``,
-       - ``R_386_GOTOFF``, ``R_386_GOTPC``, ``R_386_GOT32``,
-       - ``R_386_PLT32``
-       - ``R_386_JMP_SLOT``, ``R_386_GLOB_DAT``, ``R_386_RELATIVE`` ? (TBA)
-       - ``R_386_SIZE32`` ? (TBA)
+       - ``R_386_32``, ``R_386_PC32`` (min. 5 testów tylko te),
+       - ``R_386_GOTOFF``, ``R_386_GOTPC``, ``R_386_GOT32`` (min. 10 testów te i powyższe),
+       - ``R_386_PLT32`` – dla ``-static`` jest zwijane do ``PC32``,
+       - ``R_386_JMP_SLOT``, ``R_386_GLOB_DAT`` (dodatkowe testy bez ``-static``?. TBA),
+       - ``R_386_RELATIVE`` może być z powyższymi, ale można je zignorować,
+       - ``R_386_SIZE32`` ? (TBA).
 
 4. Utworzone pliki relokowalne będą linkowane komendą zawierającą co najmniej flagi:
-   ``cc -m32 -miamcu -nostdlib -Wl,--emit-relocs -Wl,--build-id=none -Wl,--gc-sections -T linker_script.ld # TBA: -static ?``
+   ``cc -m32 -miamcu -nostdlib -Wl,--emit-relocs -Wl,--build-id=none-T linker_script.ld``
+
+   - Flagi ``-Wl,--gc-sections`` oraz ``-static`` są opcjonalne. Proszę podać w opisie/specyfikacji rozwiązania czy mają być użyte.
 
 5. W uproszczonej wersji zadania, a więc z mniejszą liczbą punktów do zdobycia (TBA), plik wejściowy zachowa:
 
@@ -320,13 +323,17 @@ Wskazówki
 Dobrym źródłem inspiracji mogą być publikacje naukowe jak wskazana [DdisasmUSENIX]_.
 
 Do deasemblacji polecamy bibliotekę Capstone_, która ma bindingi dostępne w wielu językach.
-Do parsowania i edycji EFL-ów możemy polecić np. projekt LIEF_.
+Do parsowania i edycji EFL-ów możemy polecić np. projekt LIEF_,
+aczkolwiek mogą i tam pojawić się problematyczne kwestie związane z generycznością biblioteki.
 Warto zacząć od wersji minimum aby upewnić się, że umiemy stworzyć poprawny ELF
 (np. wiele bibliotek umie tylko czytać albo nie umie stworzyć/zmienić ``STRTAB``).
 
 Warto korzystać z poznanych na zajęciach narzędzi *binutils*.
 Na przykład, niezwykle pomocne może być połączenie flag ``d`` i ``r`` w objdump: ``objdump -r -d a.elf``.
 Gdybyśmy chcieli użyć clanga, odpowiednim targetem będzie: ``i586-intel-elfiamcu``.
+
+Dodatkowo, zainteresowani mogą chcieć spojrzeć w `źródła binutils istotne dla linkowania <https://github.com/bminor/binutils-gdb/blob/binutils-2_35_2/bfd/elf32-i386.c>`_
+oraz dodatkowe przykłady z `testów ld <https://github.com/bminor/binutils-gdb/tree/master/ld/testsuite/ld-i386>`_.
 
 
 .. literalinclude:: b-main.objdump
