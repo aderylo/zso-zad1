@@ -15,3 +15,7 @@ Pomocnicze elementy picolibc
     Zawiera minimalną implementację stdio wymaganą przez picolibc.
 ``picolibc-quarkish-linux-none.txt``
     Zawiera flagi kompilatora użyte przy budowaniu biblioteki.
+
+
+Ponadto, można znaleźć cross-kompilowane libgcc dla IA-MCU, a także w wersji skompilowanej przez natywny toolchain w ``iamcu-but-i386``.
+``libgcc`` potrzebne jest do obsługi software'owej obsługi liczb zmiennoprzecinkowych.
