@@ -8,7 +8,7 @@ static int simulated_putc(char c, FILE *file)
     (void) file;
     written = _putc(1, c); /* Defined by underlying system */
     if (written != 1) return EOF;
-    return c;
+    return 1;
 }
 
 static int simulated_getc(FILE *file)

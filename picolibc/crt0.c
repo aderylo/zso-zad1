@@ -76,9 +76,7 @@ extern void __libc_init_array(void);
 
 #include <picotls.h>
 #include <stdio.h>
-#ifdef CRT0_SEMIHOST
-#include <semihost.h>
-#endif
+
 
 #ifndef CONSTRUCTORS
 #define CONSTRUCTORS 1
@@ -98,7 +96,7 @@ asm (
 );
 
 
-static void __attribute__((section(".text.init.enter"), noreturn, used))
+static void __attribute__((section(".text.init.enter"), noreturn, used, no_reorder))
 __start(int argc, char** argv)
 {
 //	memcpy(__data_start, __data_source, (uintptr_t) __data_size);
