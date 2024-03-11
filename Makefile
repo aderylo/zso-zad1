@@ -37,7 +37,14 @@ LDFLAGS += $(CFLAGS)
 LATE_LDFLAGS += -Wl,--gc-sections
 LDFLAGS += -Wl,--emit-relocs
 LDFLAGS += -Wl,--build-id=none
+
+# This notation should work for a while...
+LD_VERSION := $(shell $(LD) --version -v 2>/dev/null | sed -n -E -e '/GNU ld/ s/[^0-9]//g p')
+# --no-warn-rwx-segments is from 2.39
+# $(intcmp) is only from Make 4.4...
+ifeq ($(shell [ ${LD_VERSION} -le 239 ] && echo less), )
 LDFLAGS += -Wl,--no-warn-rwx-segments
+endif
 
 LDFLAGS_FOR_PLT += -Wl,--dynamic-linker=
 LDFLAGS_FOR_PLT += -Wl,-znorelro,-ztextoff
@@ -131,8 +138,8 @@ examples/mi%.part: CFLAGS += -Os
 
 #examples/tricky.elf: CFLAGS += -DFULL_TEST_VERSION
 
-
 %.elf: %.part
+	@echo Linking with ld version ${LD_VERSION} through gcc
 	$(LD) $(LDFLAGS) $(LATE_LDFLAGS) $(filter %.o %.c %.part, $^)  -o $@
 
 # Note: this is not to be always assumed!
