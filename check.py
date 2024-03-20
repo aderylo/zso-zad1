@@ -23,7 +23,8 @@ try:
     from elftools.elf.constants import SH_FLAGS
     from elftools.elf.elffile import ELFFile
     from elftools.elf.enums import ENUM_RELOC_TYPE_i386
-    from elftools.elf.sections import Section
+    from elftools.elf.relocation import Relocation
+    from elftools.elf.sections import Section, Symbol
     from elftools.elf.segments import Segment
 except ImportError:
     raise ImportError("This script requires the pyelftools package to be installed.\n"
@@ -211,7 +212,7 @@ class BinFile:
             elif segment['p_vaddr'] == 0xa800a000 and segment['p_vaddr'] != segment['p_paddr']:
                 data = segment
             else:
-                warnings.warn(f"Ignoring segment {segment} at offset {segment['p_offset']}")
+                warnings.warn(f"Ignoring segment {segment} at offset {segment['p_offset']:#x}")
 
         return MainSegments(text, data, bss)
 
@@ -253,7 +254,7 @@ class BinFile:
                     yield reloc_spec
 
     @staticmethod
-    def resolve_section_vaddr(rel, section):
+    def resolve_section_vaddr(why: Relocation | Symbol | int, section):
         if section['sh_addr']:
             # assume this was the correct virtual addr
             section_vaddr = section['sh_addr']
@@ -261,7 +262,7 @@ class BinFile:
             # e.g., from .text.40030000f
             section_vaddr = int(match.group(1), 16)
         else:
-            raise ValueError(f"Cannot resolve virtual address for {rel} of {section}")
+            raise ValueError(f"Cannot resolve virtual address for {why} of {section.name}")
         return section_vaddr
 
     def find_section_for_vaddr(self, on: Literal['part', 'elf'], vaddr: int) -> Section:
@@ -303,7 +304,7 @@ class Comparator:
         CHECKED_FIELDS = ('p_vaddr', 'p_paddr', 'p_filesz', 'p_memsz')
         for field in CHECKED_FIELDS:
             if true[field] != pred[field]:
-                errs.append(f'Mismatch on {field}: expected {true[field]:#x} got {pred[field]:#x} (diff={true[field]-pred[field]})')
+                errs.append(f'Mismatch on {field}: expected {true[field]:#x} got {pred[field]:#x} (diff={true[field]-pred[field]:#x})')
         if (td := true.data()) != (pd := pred.data()):
             if len(td) != len(pd):
                 errs.append('Content length mismatch')
@@ -319,7 +320,7 @@ class Comparator:
     def compare_segments(self):
         for field, true, pred in zip(MainSegments._fields, self.truth.get_main_segments(), self.symbolized.get_main_segments()):
             res = self._compare_segments(true, pred)
-            print(f"For {field} at offset: {true['p_offset']}", res)
+            print(f"For {field} at offset: {true['p_offset']:#x}", res)
 
     def compare_relocations(self, pred_on='part', verbose=False) -> float:
         key = attrgetter('vaddr')
