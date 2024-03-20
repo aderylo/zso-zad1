@@ -39,7 +39,8 @@ LDFLAGS += -Wl,--emit-relocs
 LDFLAGS += -Wl,--build-id=none
 
 # This notation should work for a while...
-LD_VERSION := $(shell $(LD) --version -v 2>/dev/null | sed -n -E -e '/GNU ld/ s/[^0-9]//g p')
+LD_VERSION := $(shell $(LD) --version -v 2>/dev/null | sed -n -E -e '/GNU ld/ s/[^0-9]//g p'\
+                                                     | head -c3)
 # --no-warn-rwx-segments is from 2.39
 # $(intcmp) is only from Make 4.4...
 ifeq ($(shell [ ${LD_VERSION} -le 239 ] && echo less), )
