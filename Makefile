@@ -203,3 +203,9 @@ build-picolibc:
 	cd picolibc/meson-build && ninja && ninja install
 	@echo Patching the linker script to make Linux always allocate the whole simulated SRAM for us.
 	sed -i picolibc/iamcu/lib/picolibc.ld -e '/\.stack (NOLOAD)/ a . += __heap_size - (DEFINED(__heap_size_min) ? __heap_size_min : 0);'
+
+
+# May come useful to test relinking. Usage: make relink WHAT=my_reloc_file
+.PHONY: relink
+relink: Makefile
+	$(LD) $(LDFLAGS) $(LATE_LDFLAGS) $(LDFLAGS_FOR_STATIC) -static ${WHAT}  -o ${WHAT}.relf
