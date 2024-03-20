@@ -93,7 +93,7 @@ TARGET ?= all
 
 
 raw_targets := $(addprefix examples/, a.elf min.elf min_got.elf min_got_harder.elf min_plt.elf)
-stdlib_targets := $(addprefix examples/, b.elf min_libc.elf min_libc_plt.elf min_libc_constructors.elf tricky.elf iotbench.elf)
+stdlib_targets := $(addprefix examples/, b.elf min_libc.elf min_libc_plt.elf min_libc_constructors.elf tricky.elf iotbench.elf question.elf)
 all_targets := $(raw_targets) $(stdlib_targets)
 
 plt_targets := examples/min_plt.elf examples/min_libc_plt.elf
