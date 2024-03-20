@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import logging
 import re
 import shlex
 import shutil
@@ -14,10 +15,12 @@ from enum import Enum
 from functools import wraps
 from operator import attrgetter
 from pathlib import Path
+from pprint import pformat
 from subprocess import check_call, CompletedProcess, run, DEVNULL
 from tempfile import TemporaryDirectory
 from typing import Optional, Union, Literal, NamedTuple, Iterable, Any, TypeVar, Callable, Iterator, Sequence, Tuple
 
+logger = logging.getLogger(__name__)
 
 try:
     from elftools.elf.constants import SH_FLAGS
@@ -300,6 +303,11 @@ class Comparator:
     def _compare_segments(true: Segment, pred: Segment) -> list[str]:
         if pred is None and true is not None:
             return [f'Symbolized file has no segment at {true["p_vaddr"]}']
+        elif pred is not None and true is None:
+            return [f'Symbolized file should not have a segment at {pred["p_vaddr"]}']
+        elif pred is None and true is None:
+            return []
+
         errs = []
         CHECKED_FIELDS = ('p_vaddr', 'p_paddr', 'p_filesz', 'p_memsz')
         for field in CHECKED_FIELDS:
@@ -317,10 +325,20 @@ class Comparator:
                     errs.append(f'Note: .got permutation is allowed, but this is not yet whitelisted!')
         return errs
 
-    def compare_segments(self):
-        for field, true, pred in zip(MainSegments._fields, self.truth.get_main_segments(), self.symbolized.get_main_segments()):
+    def compare_segments(self, verbose=False) -> bool:
+        truth = self.truth.get_main_segments()
+        symbolized = self.symbolized.get_main_segments()
+        fail = False
+        logger.debug(f"Comparing {truth=} vs {symbolized=}")
+
+        for field, true, pred in zip(MainSegments._fields, truth, symbolized):
             res = self._compare_segments(true, pred)
-            print(f"For {field} at offset: {true['p_offset']:#x}", res)
+            fail |= bool(res)
+            if verbose and (pred is not None or true is not None):
+                res = res or 'OK'
+                print(f"For {field} at offset: {(pred or true)['p_offset']:#x}", pformat(res))
+
+        return fail
 
     def compare_relocations(self, pred_on='part', verbose=False) -> float:
         key = attrgetter('vaddr')
@@ -392,7 +410,7 @@ class SectionReplacement:
         elf_path = Path(elf_path)
         # We keep this file for reference
         new_bin_file = elf_path.with_suffix(f'{elf_path.suffix}.{section_name}.bin')
-        new_bin_file.write_bytes(ELFFile.load_from_path(elf_path).get_section_by_name(section_name).data)
+        new_bin_file.write_bytes(ELFFile.load_from_path(elf_path).get_section_by_name(section_name).data())
         return new_bin_file
 
     def get_replaced_section_name(self, c: Comparator):
@@ -538,7 +556,7 @@ class TestSpec:
             print("\n -- RELINKING --\n"
                   "Segment equivalence issues (this should be enough to prove no behavior change):")
         # XXX: this doesn't properly check GOT yet and always returns None
-        rebuild_fail = cmp.compare_segments()
+        rebuild_fail = cmp.compare_segments(verbose=verbose)
         if rebuild_fail:
             base_score /= 3
 
