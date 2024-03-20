@@ -17,7 +17,7 @@ static int simulated_putc(char c, FILE *file)
 
 static int simulated_getc(FILE *file)
 {
-    unsigned char c;
+    char c;
     (void) file; /* Not used in this function */
     c = _getc(); /* Defined by underlying system */
     if (c < 0)
