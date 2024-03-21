@@ -132,20 +132,20 @@ class ExecReloc(NamedTuple):
     vaddr: int
     value: int
     type_: RELOC_TYPE_I386
+    symbol: Symbol
 
     def __str__(self):
-        return f"ExecReloc({self.type_.name} @ 0x{self.vaddr:08x} => 0x{self.value:08x})"
+        return f"ExecReloc({self.type_.name} @ 0x{self.vaddr:08x} => 0x{self.value:08x} '{self.symbol.name}')"
 
 class RelReloc(NamedTuple):
     vaddr: int
     value: int | str
     type_: RELOC_TYPE_I386
+    symbol: Symbol
 
     def __str__(self):
         target = f"0x{self.value:08x}" if isinstance(self.value, int) else self.value
-        return f"RelReloc({self.type_.name} @ 0x{self.vaddr:08x} => {target})"
-
-MAGIC_REL_VALUE = 0x90091317
+        return f"RelReloc({self.type_.name} @ 0x{self.vaddr:08x} => {target} '{self.symbol.name}')"
 
 @dataclasses.dataclass
 class BinFile:
@@ -233,12 +233,7 @@ class BinFile:
 
                 if on == 'elf':
                     assert elf['e_type'] == 'ET_EXEC'
-                    if symbol['st_info']['type'] == 'STT_SECTION':
-                        # TODO: ld doesn't preserve full relocations for objects.
-                        #       Think how to check this without revealing too much.
-                        reloc_spec = ExecReloc(rel['r_offset'], MAGIC_REL_VALUE, type_)
-                    else:
-                        reloc_spec = ExecReloc(rel['r_offset'], symbol['st_value'], type_)
+                    reloc_spec = ExecReloc(rel['r_offset'], symbol['st_value'], type_, symbol)
                     yield reloc_spec
                 else:
                     assert elf['e_type'] == 'ET_REL'
@@ -253,7 +248,7 @@ class BinFile:
                         target_section_vaddr = self.resolve_section_vaddr(symbol, elf.get_section(sym_section_idx))
                         target = symbol['st_value'] + target_section_vaddr
 
-                    reloc_spec = RelReloc(rel_vaddr, target, type_)
+                    reloc_spec = RelReloc(rel_vaddr, target, type_, symbol)
                     yield reloc_spec
 
     @staticmethod
@@ -369,15 +364,21 @@ class Comparator:
             type_match = true_rel.type_ == pred_rel.type_
 
             if value_match and type_match:
-                # A simple case
-                match += 1
+                if pred_rel.symbol['st_shndx'] == 'SHN_ABS' and true_rel.value:
+                    if verbose:
+                        extra = f"(originally {true_name}) " if (true_name := true_rel.symbol.name) else ""
+                        print(f"Relocation against an ABS symbol {extra}is probably not what you want: {pred_rel}.")
+                    mismatch += 1
+                else:
+                    # A simple case
+                    match += 1
             elif pred_rel.value == 'SHN_UNDEF' and type_match and true_rel.type_ == RELOC_TYPE_I386.R_386_GOTPC:
                 # gotpc should be undef
                 match += 1
             elif value_match and true_rel.type_ == RELOC_TYPE_I386.R_386_PLT32 and pred_rel.type_ == RELOC_TYPE_I386.R_386_PC32:
                 # TODO: need a check if the symbol was actually collapsed
                 match += 1
-            elif true_rel.value == MAGIC_REL_VALUE and type_match:
+            elif type_match and true_rel.symbol['st_info']['type'] == 'STT_SECTION':
                 if verbose:
                     print(f"Note: Object relocations are not checking the destination address currently: {pred_rel}.")
                 match += 1
