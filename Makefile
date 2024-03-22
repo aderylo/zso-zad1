@@ -218,3 +218,11 @@ build-picolibc:
 .PHONY: relink
 relink: Makefile
 	$(LD) $(LDFLAGS) $(LATE_LDFLAGS) $(LDFLAGS_FOR_STATIC) -static ${WHAT}  -o ${WHAT}.relf
+
+check.pex: check.py
+	# -D checklib
+	pex -o $@ -v --sh-boot --exe $< "pyelftools==0.29"
+
+.PHONY: prepare-zso-image
+relink: prepare-zso-image
+	sudo apt install -f llvm-16 # for llvm-objcopy

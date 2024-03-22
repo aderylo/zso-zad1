@@ -69,7 +69,10 @@ if not typing.TYPE_CHECKING:
     if not shutil.which(GCC_FOR_LD):
         raise ImportError(f"Cannot find {GCC_FOR_LD} in PATH")
     if not shutil.which(OBJCOPY):
-        raise ImportError(f"Cannot find {OBJCOPY} in PATH. The llvm version is required.")
+        if shutil.which(OBJCOPY + '-16'):
+            OBJCOPY = OBJCOPY + '-16'
+        else:
+            raise ImportError(f"Cannot find {OBJCOPY} in PATH. The llvm version is required.")
 
 TRACE_COMMANDS = True
 if TRACE_COMMANDS:

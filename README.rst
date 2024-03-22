@@ -14,6 +14,8 @@ Użycie
 Skrypt ``Makefile`` zakłada zainstalowane ``x86_64-linux-gnu-gcc-10``.
 Zawiera zestaw podstawowych flag opisanych w zadaniu oraz przykładowe flagi dodatkowe.
 
+Na obrazie QEMU musimy doinstalować narzędzia llvm: ``make prepare-zso-image``.
+
 Wykonując ``make run-a run-b`` możemy skompilować i uruchomić przykładowe programy.
 
 W katalogu ``picolibc`` znajduje się skompilowana wersja biblioteki standardowej, submoduł źródłowy oraz wymagany klej.
