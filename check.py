@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import logging
+import os
 import re
 import shlex
 import shutil
@@ -16,6 +17,7 @@ from functools import wraps
 from operator import attrgetter
 from pathlib import Path
 from pprint import pformat
+from runpy import run_path
 from subprocess import check_call, CompletedProcess, run, DEVNULL
 from tempfile import TemporaryDirectory
 from typing import Optional, Union, Literal, NamedTuple, Iterable, Any, TypeVar, Callable, Iterator, Sequence, Tuple
@@ -33,12 +35,29 @@ except ImportError:
     raise ImportError("This script requires the pyelftools package to be installed.\n"
                       "Alternatively, try using the .pex self-contained version of this script.")
 
+ROOT_PATH = Path(os.environ.get('PEX', __file__)).parent
+HACKY_RELPATH: Optional[Path] = None
+def GitPath(path='') -> Path:
+    """Hacky path constructor that reinterprets absolute paths, which are relative to the git repo.
+
+    When relative paths are created, their base may be overridden with global HACKY_RELPATH.
+    """
+    if isinstance(path, Path):
+        return path
+
+    path = Path(path)
+    if path.is_absolute():
+        path = ROOT_PATH / path.relative_to(path.anchor)
+    elif HACKY_RELPATH:
+        path = HACKY_RELPATH / path
+    return path
+
 GCC_FOR_LD = 'x86_64-linux-gnu-gcc-10'
 LD_BASE_FLAGS = ['-march=lakemont', '-mtune=lakemont', '-m32', '-miamcu', '-msoft-float',
                  '-nostdlib',  '-Wl,--no-relax', '-Wl,--emit-relocs',  '-Wl,--build-id=none',
                  # '-Wl,--no-warn-rwx-segments',
                  '-Wl,--strip-debug',
-                 '-T', Path(sys.argv[0]).parent / Path('picolibc/iamcu/lib/picolibc.ld')
+                 '-T', GitPath('/picolibc/iamcu/lib/picolibc.ld')
                  ]
 LD_STATIC_FLAGS = ['-Wl,-znorelro,-ztext', '-static']
 
@@ -406,9 +425,9 @@ class SectionReplacement:
 
     def get_or_create_bin_file(self) -> Path:
         if self.bin_file:
-            return Path(self.bin_file)
+            return GitPath(self.bin_file)
         elf_path, section_name = self.from_elf_section
-        elf_path = Path(elf_path)
+        elf_path = GitPath(elf_path)
         # We keep this file for reference
         new_bin_file = elf_path.with_suffix(f'{elf_path.suffix}.{section_name}.bin')
         new_bin_file.write_bytes(ELFFile.load_from_path(elf_path).get_section_by_name(section_name).data())
@@ -468,27 +487,24 @@ def execute(bin: Path, stdin: Optional[Path]) -> CompletedProcess:
     else:
         kwargs['stdin'] = DEVNULL
 
-    return run(['i386', bin], capture_output=True, timeout=10, )
+    return run(['i386', bin if bin.is_absolute() else f"./{bin}"], capture_output=True, timeout=10, )
+
 
 @dataclasses.dataclass
-class ReplacementSpec:
+class RunSpec:
+    exit_code: Optional[int]
     #: Path to file
-    exit_code: int
-
     expected_stdout: Optional[str] = None
     stdin: Optional[str] = None
-
-    replacements: Sequence[SectionReplacement] = ()
-    obj_override: Optional[OverrideFromObject] = None
 
     def compare_output(self, bin: BinFile) -> list[str]:
         errs = []
         result = execute(bin.elf, self.stdin and Path(self.stdin))
-        if result.returncode != self.exit_code:
+        if self.exit_code is not None and result.returncode != self.exit_code:
             errs.append(f"Return code mismatch: {result.returncode} instead of {self.exit_code}")
 
         if self.expected_stdout:
-            data = Path(self.expected_stdout).read_bytes()
+            data = GitPath(self.expected_stdout).read_bytes()
             if data != result.stdout:
                 if data.startswith(result.stdout):
                     errs.append("Stdout mismatch, but the result is a prefix.")
@@ -497,6 +513,15 @@ class ReplacementSpec:
                 else:
                     errs.append("Stdout mismatch.")
         return errs
+
+@dataclasses.dataclass
+class ReplacementSpec:
+    behavior: RunSpec
+    replacements: Sequence[SectionReplacement] = ()
+    obj_override: Optional[OverrideFromObject] = None
+
+    def compare_output(self, bin: BinFile) -> list[str]:
+        return self.behavior.compare_output(bin)
 
     def replace_and_link(self, c: Comparator) -> BinFile:
         new_rel = c.symbolized.elf.with_suffix('.hax.part')
@@ -514,7 +539,18 @@ class TestSpec:
     links_picolibc: bool
     pic: Literal['unrestricted', 'no-plt', 'simple', 'none']
     extra_cflags: Sequence[str]
+    unmodified_behavior: RunSpec
     replacement: ReplacementSpec
+
+    # All the functions return truthy value on error.
+    def evaluate_relinking(self, c: Comparator, verbose=True) -> bool:
+        rebuild_fail = c.compare_segments(verbose=verbose)
+        execution_errs = self.unmodified_behavior.compare_output(c.symbolized)
+        if execution_errs and verbose:
+            print('Relinking execution errors:')
+            print('\n'.join(execution_errs))
+
+        return bool(rebuild_fail) or bool(execution_errs)
 
     def evaluate_replacement(self, c: Comparator, verbose=True) -> bool:
         # all flags ar in c.symbolized
@@ -525,7 +561,7 @@ class TestSpec:
             return True
 
         errs = self.replacement.compare_output(new_bin)
-        if verbose:
+        if verbose and errs:
             print('Replacement errors:')
             print('\n'.join(errs))
         return bool(errs)
@@ -537,7 +573,15 @@ class TestSpec:
             return ('static',)
         return ()
 
-    def score_symbolization(self, test_bin: BinFile, symbolized: Path, extra_ld_flags=(), verbose=True)\
+    def test_validation_sanity_check(self, test_bin: BinFile, verbose=True) -> bool:
+        errs = self.unmodified_behavior.compare_output(test_bin)
+        if errs and verbose:
+            print('TestCase smoke test errors:')
+            print('\n'.join(errs))
+        return bool(errs)
+
+
+    def score_symbolization(self, test_bin: BinFile, symbolized: Path, extra_ld_flags=(), verbose=True) \
             -> Tuple[Comparator, float]:
         flags = self.merge_flags(extra_ld_flags)
         bin = BinFile.from_relocatable(symbolized, flags)
@@ -552,21 +596,25 @@ class TestSpec:
             print("\nAttempting to continue...")
             base_score = 0.0
 
-        if verbose:
-            print(f'{base_score=}')
-            print("\n -- RELINKING --\n"
-                  "Segment equivalence issues (this should be enough to prove no behavior change):")
-        # XXX: this doesn't properly check GOT yet and always returns None
-        rebuild_fail = cmp.compare_segments(verbose=verbose)
-        if rebuild_fail:
-            base_score /= 3
+        print(f"Relocations score:", "ALL" if base_score == 1.0 else f"{base_score:.3f}")
 
         if verbose:
-            print(f'{rebuild_fail=}')
+            print("\n -- RELINKING --\n"
+                  "Segment equivalence issues (this should be enough to prove no behavior change):")
+
+        # XXX: this doesn't properly check GOT permutations yet
+        rebuild_fail = self.evaluate_relinking(cmp, verbose=verbose)
+        if rebuild_fail:
+            base_score /= 3
+        print(f"Relinking (step 2):", "fail? (read error comments)" if rebuild_fail else "OK")
+
+        if verbose:
             print("\n -- REPLACEMENT --")
         replacement_fail = self.evaluate_replacement(cmp, verbose)
         if replacement_fail:
             base_score /= 2
+
+        print(f"Replacement (step 3):", "FAIL" if replacement_fail else "OK")
 
         return cmp, base_score
 
@@ -619,22 +667,47 @@ if __name__ == '__main__':
     parser.add_argument('--quiet', '-q', action='store_false', dest='verbose')
     args = parser.parse_args()
 
+    if args.verbose is False and hasattr(run, '__wrapped__'):
+        # TODO: make it in a proper way
+        run = run.__wrapped__
+        check_call = check_call.__wrapped__
+
     # TODO: load this from file
-    test = TestSpec(
-        link_mode='static',
-        links_picolibc=True,
-        pic='unrestricted',
-        extra_cflags=(),
-        replacement=ReplacementSpec(
-            exit_code=123,
-            expected_stdout=None,
-            replacements=[SectionReplacement(
-                bin_file='replacements/exit123.bin',
-                symbol_name='_exit',
-            )],
+    if args.ground_truth_exec.is_dir():
+        test_dir: Path = args.ground_truth_exec
+        # From now on, any relative conversion from string to GitPath will be relative to the test directory!
+        HACKY_RELPATH = test_dir
+
+        spec_file = test_dir / 'spec.py'
+        assert spec_file.exists(), "spec.py file not present!"
+
+        # TODO: consider allowing the spec to import stuff instead of this hacky injection
+        test_spec_dict = run_path(spec_file, init_globals=globals())
+        test = test_spec_dict['SPEC']
+
+        # TODO: add an option to declaratively-create the binary
+        gt = BinFile(elf=GitPath(test_spec_dict['PRECOMPILED_ELF_FILE']))
+    else:
+        # Provide a generic case
+        test = TestSpec(
+            link_mode='static',
+            links_picolibc=True,
+            pic='unrestricted',
+            extra_cflags=(),
+            # Don't check anything
+            unmodified_behavior=RunSpec(exit_code=None),
+            replacement=ReplacementSpec(
+                RunSpec(exit_code=123),
+                replacements=[SectionReplacement(
+                    bin_file='replacements/exit123.bin',
+                    symbol_name='_exit',
+                )],
+            )
         )
-    )
-    gt = BinFile.from_test(args.ground_truth_exec)
+
+        gt = BinFile.from_test(args.ground_truth_exec)
+
+    assert not test.test_validation_sanity_check(gt, verbose=args.verbose)
     c, preliminary_score = test.score_symbolization(gt, args.symbolized_rel, verbose=args.verbose)
 
     if args.verbose:
