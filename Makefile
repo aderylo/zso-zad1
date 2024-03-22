@@ -101,8 +101,10 @@ plt_targets := examples/min_plt.elf examples/min_libc_plt.elf
 #plt_targets += examples/b.elf examples/min_libc.elf examples/tricky.elf
 static_targets := $(filter-out $(plt_targets), $(all_targets))
 
-all: $(all_targets)
-	for target in $^; do \
+all: force
+	# Manually run this makefile or each target.
+	# (dependencies may be compiled with various flags)
+	for target in ${all_targets}; do \
 		$(MAKE) -C . -B $$target; \
 	done
 
