@@ -102,6 +102,9 @@ plt_targets := examples/min_plt.elf examples/min_libc_plt.elf
 static_targets := $(filter-out $(plt_targets), $(all_targets))
 
 all: $(all_targets)
+	for target in $^; do \
+		$(MAKE) -C . -B $$target; \
+	done
 
 # This syntax updates the var only for matching targets (and dependents)
 $(stdlib_targets): LIBRARIES += -lc -lm -lgcc
@@ -147,14 +150,17 @@ examples/mi%.part: CFLAGS += -Os
 %.part: %.o
 	$(LD) $(LDFLAGS)  -Wl,-\( $(filter %.o, $^) $(LIBRARIES) -Wl,-\) -o $@ -r -Wl,-e,_start -Wl,--gc-sections
 
-%.o: %.S Makefile
+%.o: %.S Makefile force
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.c Makefile include/*
+%.o: %.c Makefile include/* force
 	$(CC) $(CFLAGS) -c $< -o $@
 
 %.flash: %.elf
 	$(OBJCOPY) $(OBJCOPY_FLAGS) $< $@
+
+force: ;
+.PHONY: force
 
 
 %.strip: %.elf
