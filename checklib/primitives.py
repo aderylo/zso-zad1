@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shlex
 import shutil
 import sys
@@ -20,7 +21,8 @@ __all__ = [
     'execute',
 ]
 
-GCC_FOR_LD = 'x86_64-linux-gnu-gcc-10'
+# Allow for externally hacking these vars
+GCC_FOR_LD = os.environ.get('LD', 'x86_64-linux-gnu-gcc-10')
 LD_BASE_FLAGS = ['-march=lakemont', '-mtune=lakemont', '-m32', '-miamcu', '-msoft-float',
                  '-nostdlib',  '-Wl,--no-relax', '-Wl,--emit-relocs',  '-Wl,--build-id=none',
                  # '-Wl,--no-warn-rwx-segments',
@@ -30,7 +32,7 @@ LD_BASE_FLAGS = ['-march=lakemont', '-mtune=lakemont', '-m32', '-miamcu', '-msof
 LD_STATIC_FLAGS = ['-Wl,-znorelro,-ztext', '-static']
 
 # GNU objcopy seems to improperly handle ET_EXEC with static relocation sections
-OBJCOPY = 'llvm-objcopy'
+OBJCOPY = os.environ.get('LLOBJCOPY', 'llvm-objcopy')
 OBJCOPY_FLAGS = ['-O', 'binary', '--gap-fill', '0x90']
 
 if not typing.TYPE_CHECKING:
