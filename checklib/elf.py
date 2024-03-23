@@ -161,14 +161,14 @@ class BinFile:
                     if isinstance(sym_section_idx, str):
                         target = symbol['st_value'] if sym_section_idx == 'SHN_ABS' else sym_section_idx
                     else:
-                        target_section_vaddr = self.resolve_section_vaddr(symbol, elf.get_section(sym_section_idx))
+                        target_section_vaddr = self.resolve_section_vaddr(symbol.name, elf.get_section(sym_section_idx))
                         target = symbol['st_value'] + target_section_vaddr
 
                     reloc_spec = RelReloc(rel_vaddr, target, type_, symbol)
                     yield reloc_spec
 
     @staticmethod
-    def resolve_section_vaddr(why: Relocation | Symbol | int, section):
+    def resolve_section_vaddr(why: Relocation | Symbol | int | str, section):
         if section['sh_addr']:
             # assume this was the correct virtual addr
             section_vaddr = section['sh_addr']
