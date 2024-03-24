@@ -14,7 +14,7 @@ include_directories(${LIEF_PATH}/include)
 find_library(LIEF_LIBRARY NAMES LIEF PATHS ${LIEF_PATH}/lib NO_DEFAULT_PATH)
 
 # Define your target (executable or library)
-add_executable(YourTargetName src/main.cpp)  # or add_library for libraries
+add_executable(symbolize src/main.cpp)  # or add_library for libraries
 
 # Link your target with the LIEF library
-target_link_libraries(YourTargetName ${LIEF_LIBRARY})
+target_link_libraries(symbolize ${LIEF_LIBRARY})
