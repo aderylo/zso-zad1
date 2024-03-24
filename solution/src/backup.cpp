@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <iostream>
-#include <memory>
-#include <iostream>
-#include <fstream>
 #include <algorithm>
+#include <fstream>
+#include <iostream>
 #include <iterator>
+#include <memory>
 
 #include <tuple>
 
@@ -26,14 +25,12 @@
 
 using namespace LIEF::ELF;
 
-uint64_t get_symbol_file_offset(LIEF::ELF::Symbol &symbol)
-{
+uint64_t get_symbol_file_offset(LIEF::ELF::Symbol &symbol) {
   auto section = *symbol.section();
   return section.file_offset() + symbol.value() - section.virtual_address();
 }
 
-Section create_function_section(Symbol &symbol)
-{
+Section create_function_section(Symbol &symbol) {
   auto s = Section();
   s.name(".text." + symbol.name());
   s.type(ELF_SECTION_TYPES::SHT_PROGBITS);
@@ -45,11 +42,9 @@ Section create_function_section(Symbol &symbol)
   return s;
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   std::cout << "ELF Section rename" << '\n';
-  if (argc != 3)
-  {
+  if (argc != 3) {
     std::cerr << "Usage: " << argv[0] << "<binary> <binary output name>" << '\n';
     return -1;
   }
@@ -60,10 +55,8 @@ int main(int argc, char **argv)
 
   // binary->header().file_type(E_TYPE::ET_REL);
 
-  for (auto &symbol : symbol_table)
-  {
-    if (symbol.is_function())
-    {
+  for (auto &symbol : symbol_table) {
+    if (symbol.is_function()) {
       std::cout << symbol.name() << "\n";
       // std::cout << *symbol.section() << "\n";
       std::cout << symbol.section()->file_offset() << "\n";
