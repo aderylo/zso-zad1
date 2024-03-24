@@ -49,6 +49,7 @@ meson-*/
 
 # CMake
 cmake-build-*/
+build
 
 # Mongo Explorer plugin
 .idea/**/mongoSettings.xml
@@ -145,3 +146,5 @@ dkms.conf
 *.iml
 out
 gen
+
+
