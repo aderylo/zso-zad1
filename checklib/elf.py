@@ -192,6 +192,43 @@ class BinFile:
         else:
             raise IndexError(f"No section matching exactly {vaddr=:#x} found in {self}")
 
+LINKER_GENERATED_SYMBOLS = set("""
+__stack
+__text_end
+__etext
+_etext
+etext
+__preinit_array_start
+__preinit_array_end
+__init_array_start
+__init_array_end
+__fini_array_start
+__fini_array_end
+__preserve_start__
+__preserve_end__
+__global_pointer$
+_gp
+__data_start
+__data_source
+__data_end
+__tdata_end
+__data_source_end
+__edata
+_edata
+edata
+__data_size
+__data_source_size
+__bss_start
+__bss_end
+__non_tls_bss_start
+__end
+_end
+end
+__bss_size
+__heap_start
+__heap_end
+__heap_size
+""".split())
 
 @dataclasses.dataclass
 class Comparator:
@@ -295,7 +332,8 @@ class Comparator:
                 else:
                     # A simple case
                     match += 1
-            elif pred_rel.value == 'SHN_UNDEF' and type_match and true_rel.type_ == RELOC_TYPE_I386.R_386_GOTPC:
+            elif (pred_rel.value == 'SHN_UNDEF' and type_match and
+                  (true_rel.type_ == RELOC_TYPE_I386.R_386_GOTPC or true_rel.symbol.name in LINKER_GENERATED_SYMBOLS)):
                 # gotpc should be undef
                 match += 1
             elif value_match and true_rel.type_ == RELOC_TYPE_I386.R_386_PLT32 and pred_rel.type_ == RELOC_TYPE_I386.R_386_PC32:
