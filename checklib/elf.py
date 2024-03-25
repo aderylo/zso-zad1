@@ -84,10 +84,10 @@ class BinFile:
             raise ValueError(f"ELF file {self.elf} doesn't exist.")
         if self.part:
             assert self.part.exists()
-            assert self.part.stat().st_mtime < self.elf.stat().st_mtime
+            assert self.part.stat().st_mtime <= self.elf.stat().st_mtime
         if self._stripped:
             assert self._stripped.exists()
-            assert self.elf.stat().st_mtime < self._stripped.stat().st_mtime
+            assert self.elf.stat().st_mtime <= self._stripped.stat().st_mtime
 
     @classmethod
     def from_test(cls, elf_base: Path) -> BinFile:
