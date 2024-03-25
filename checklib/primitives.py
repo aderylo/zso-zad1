@@ -45,25 +45,22 @@ if not typing.TYPE_CHECKING:
             raise ImportError(f"Cannot find {OBJCOPY} in PATH. The llvm version is required.")
 
 TRACE_COMMANDS = True
-if TRACE_COMMANDS:
+if not typing.TYPE_CHECKING:
     @wraps(run)
     def run(cmd, *args, **kwargs):
-        print(shlex.join(map(str, cmd)), file=sys.stderr)
+        if TRACE_COMMANDS:
+            print(shlex.join(map(str, cmd)), file=sys.stderr)
         return run.__wrapped__(cmd, *args, **kwargs)
 
     @wraps(check_call)
     def check_call(cmd, *args, **kwargs):
-        print(shlex.join(map(str, cmd)), file=sys.stderr)
+        if TRACE_COMMANDS:
+            print(shlex.join(map(str, cmd)), file=sys.stderr)
         return check_call.__wrapped__(cmd, *args, **kwargs)
 
 def untrace_commands():
-    global run
-    global check_call
-
-    if hasattr(run, '__wrapped__'):
-        # TODO: make it in a proper  way
-        run = run.__wrapped__
-        check_call = check_call.__wrapped__
+    global TRACE_COMMANDS
+    TRACE_COMMANDS = False
 
 
 def link_relocatable(partial_path: Path, dst: Path, mode: Literal['static'] = 'static',
@@ -127,13 +124,12 @@ def remove_section(src: Path, dst: Path, section_name: str):
     check_call([OBJCOPY, '--remove-section', section_name, src, dst])
 
 
-def execute(bin: Path, stdin: Optional[Path]) -> CompletedProcess:
+def execute(bin: Path, stdin: Optional[Path], **kwargs) -> CompletedProcess:
     # TODO: run in qemu
-    kwargs = {}
     # To make sure the program is not modifying it
     if stdin is not None:
         kwargs['input'] = stdin.read_bytes()
     else:
         kwargs['stdin'] = DEVNULL
 
-    return run(['i386', bin if bin.is_absolute() else f"./{bin}"], capture_output=True, timeout=10, )
+    return run(['i386', bin if bin.is_absolute() else f"./{bin}"], capture_output=True, timeout=10, **kwargs)

@@ -93,7 +93,7 @@ class RunSpec:
 
     def compare_output(self, bin: BinFile) -> list[str]:
         errs = []
-        result = execute(bin.elf, self.stdin and Path(self.stdin))
+        result = execute(bin.elf, self.stdin and GitPath(self.stdin))
         if self.exit_code is not None and result.returncode != self.exit_code:
             errs.append(f"Return code mismatch: {result.returncode} instead of {self.exit_code}")
 

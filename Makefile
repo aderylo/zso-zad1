@@ -184,9 +184,20 @@ examples/tricky.elf:
 run-a: examples/a-run
 run-b: examples/b-run
 
+.PHONY: clean clean-tests git-clean git-tidy
 source_dirs = examples/ picolibc/
 clean:
 	-rm -f  $(foreach dir, $(source_dirs), $(addprefix $(dir), *.elf *.part *.strip *.o *.flash))
+
+clean-tests:
+	-git clean -f -x -- tests/
+
+git-clean: clean-tests
+	-git clean -f -x -- $(source_dirs)
+
+git-tidy:
+	-git clean -i -X
+	-git clean -i
 
 
 .PHONY: build-picolibc

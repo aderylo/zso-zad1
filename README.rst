@@ -47,6 +47,17 @@ Pozostałe przydatne cele make (na przykładzie programu a):
 ``examples/a-run``
     Tak samo jak ``run-a``, ale nie jest zahardkodowanym skrótem.
 
+``clean``
+    Czyści pliki wygenerowane przez ``make all``.
+``clean-tests``
+    Czyści tymczasowe pliki wygenerowane przez sprawdzarkę.
+``git-clean``
+    Czyści wszystkie nieśledzone przez gita pliki w katalogach z budowaniem.
+``git-tidy``
+    Czyści wszystkie nieśledzone pliki.
+``git reset --hard``
+    Też można użyć.
+
 Ponadto, uruchamiając ``make build-picolibc`` możemy przekompilować używaną bibliotekę standardową.
 
 Dodatkowe źródła testów

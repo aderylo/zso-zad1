@@ -99,7 +99,9 @@ def check_single(args: NamedTuple):
 
         gt = BinFile.from_test(args.ground_truth_exec)
 
-    assert not test.test_validation_sanity_check(gt, verbose=args.verbose)
+    if args.verbose:
+        print("Test validation...")
+    assert not test.test_validation_sanity_check(gt, verbose=args.verbose), "Test validation failed!"
     c, preliminary_score = test.score_symbolization(gt, args.symbolized_rel, verbose=args.verbose)
 
     if args.verbose:
