@@ -32,17 +32,18 @@ LD_BASE_FLAGS = ['-march=lakemont', '-mtune=lakemont', '-m32', '-miamcu', '-msof
 LD_STATIC_FLAGS = ['-Wl,-znorelro,-ztext', '-static']
 
 # GNU objcopy seems to improperly handle ET_EXEC with static relocation sections
-OBJCOPY = os.environ.get('LLOBJCOPY', 'llvm-objcopy')
+LLOBJCOPY = os.environ.get('LLOBJCOPY', 'llvm-objcopy')
+OBJCOPY = os.environ.get('OBJCOPY', 'x86_64-linux-gnu-objcopy')
 OBJCOPY_FLAGS = ['-O', 'binary', '--gap-fill', '0x90']
 
 if not typing.TYPE_CHECKING:
     if not shutil.which(GCC_FOR_LD):
         raise ImportError(f"Cannot find {GCC_FOR_LD} in PATH")
-    if not shutil.which(OBJCOPY):
-        if shutil.which(OBJCOPY + '-16'):
-            OBJCOPY = OBJCOPY + '-16'
+    if not shutil.which(LLOBJCOPY):
+        if shutil.which(LLOBJCOPY + '-16'):
+            LLOBJCOPY = LLOBJCOPY + '-16'
         else:
-            raise ImportError(f"Cannot find {OBJCOPY} in PATH. The llvm version is required.")
+            raise ImportError(f"Cannot find {LLOBJCOPY} in PATH. The llvm version is required.")
 
 TRACE_COMMANDS = True
 if not typing.TYPE_CHECKING:
@@ -106,7 +107,7 @@ STRIP_LEVEL_FLAGS=dict(
 )
 
 def strip_elf_exec_to_level(elf_path: Path, dst: Path, level: str):
-    cmd = [OBJCOPY]
+    cmd = [LLOBJCOPY]
     level_flags = STRIP_LEVEL_FLAGS[level]
     if callable(level_flags):
         # This needs two levels!
@@ -117,8 +118,12 @@ def strip_elf_exec_to_level(elf_path: Path, dst: Path, level: str):
     return dst
 
 
-def replace_section(src: Path, dst: Path, section_name: str, data_file: Path):
-    check_call([OBJCOPY, '--update-section', f'{section_name}={data_file}', src, dst])
+def replace_section(src: Path, dst: Path, section_name: str, data_file: Path, also_remove: Optional[str] = None):
+    cmd = [OBJCOPY, '--update-section', f'{section_name}={data_file}']
+    if also_remove:
+        cmd.extend(['--remove-section', also_remove])
+    cmd.extend([src, dst])
+    check_call(cmd)
 
 def remove_section(src: Path, dst: Path, section_name: str):
     check_call([OBJCOPY, '--remove-section', section_name, src, dst])

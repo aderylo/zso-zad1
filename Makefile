@@ -138,6 +138,7 @@ examples/b.o: CFLAGS += -Wno-format # picolibc's doing a weird trick
 examples/a.part: CFLAGS += $(NOTHING)
 #examples/a.part: CFLAGS += $(NO_PLT)
 examples/b.part: CFLAGS += $(NO_PLT)
+examples/question.part: CFLAGS += $(SIMPLE_PIC)
 
 #picolibc/crt0.o: CFLAGS += -fno-pic -fno-plt
 examples/mi%.part: CFLAGS += -Os

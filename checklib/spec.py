@@ -64,10 +64,9 @@ class SectionReplacement:
     def modify_inplace(self, elf_path: Path, c: Comparator):
         data_file = self.get_or_create_bin_file()
         section_name = self.get_replaced_section_name(c)
-        replace_section(elf_path, elf_path, section_name, data_file)
         rel_name = f'.rel{section_name}'
-        if c.symbolized.parsed('part').get_section_by_name(rel_name):
-            remove_section(elf_path, elf_path, rel_name)
+        replace_section(elf_path, elf_path, section_name, data_file,
+                        also_remove=c.symbolized.parsed('part').get_section_by_name(rel_name) and rel_name)
 
 
 @dataclasses.dataclass
@@ -200,7 +199,7 @@ class TestSpec:
         rebuild_fail = self.evaluate_relinking(cmp, verbose=verbose)
         if rebuild_fail:
             base_score /= 3
-        print(f"Relinking (step 2):", "fail? (read error comments)" if rebuild_fail else "OK")
+        print(f"Relinking (step 2):", "fail? (read error comments; if execution works, it may be fine)" if rebuild_fail else "OK")
 
         if verbose:
             print("\n -- REPLACEMENT --")
