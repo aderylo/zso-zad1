@@ -5,7 +5,7 @@ PRECOMPILED_ELF_FILE = 'question.elf'
 
 SPEC = TestSpec(
     link_mode='static',
-    links_picolibc=False,
+    links_picolibc=True,
     pic='simple',
     extra_cflags=(),
     unmodified_behavior=RunSpec(
