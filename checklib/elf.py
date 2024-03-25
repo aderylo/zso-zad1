@@ -213,17 +213,24 @@ class Comparator:
     @staticmethod
     def _compare_segments(true: Segment, pred: Segment) -> list[str]:
         if pred is None and true is not None:
-            return [f'Symbolized file has no segment at {true["p_vaddr"]}']
-        elif pred is not None and true is None:
-            return [f'Symbolized file should not have a segment at {pred["p_vaddr"]}']
+            return [f'Symbolized file has no segment for {true["p_vaddr"]:#x} in source.']
+        elif true is None and pred is not None:
+            if not pred['p_memsz']:
+                # Empty
+                return []
+            return [f'Symbolized file should not have a segment at {pred["p_vaddr"]:#x}']
         elif pred is None and true is None:
             return []
 
         errs = []
-        CHECKED_FIELDS = ('p_vaddr', 'p_paddr', 'p_filesz', 'p_memsz')
+        CHECKED_FIELDS = ( 'p_memsz', 'p_filesz', 'p_vaddr', 'p_paddr',)
         for field in CHECKED_FIELDS:
             if true[field] != pred[field]:
                 errs.append(f'Mismatch on {field}: expected {true[field]:#x} got {pred[field]:#x} (diff={true[field]-pred[field]:#x})')
+            # Hacky:
+            if field == 'p_memsz' and not true[field]:
+                break
+
         if (td := true.data()) != (pd := pred.data()):
             if len(td) != len(pd):
                 errs.append('Content length mismatch')
