@@ -172,7 +172,7 @@ class BinFile:
         if section['sh_addr']:
             # assume this was the correct virtual addr
             section_vaddr = section['sh_addr']
-        elif match := re.match(r'\.[\w\d.]+\.([\da-fA-F]{8})\w?', section.name):
+        elif match := re.match(r'\.[\w\d.]+\.x?([\da-fA-F]{8})\w?', section.name):
             # e.g., from .text.40030000f
             section_vaddr = int(match.group(1), 16)
         else:
