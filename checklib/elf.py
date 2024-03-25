@@ -323,6 +323,9 @@ class Comparator:
             value_match = true_rel.value == pred_rel.value
             type_match = true_rel.type_ == pred_rel.type_
 
+            allow_undef = (true_rel.type_ == RELOC_TYPE_I386.R_386_GOTPC
+                           or true_rel.symbol['st_shndx'] == 'SHN_UNDEF'
+                           or true_rel.symbol.name in LINKER_GENERATED_SYMBOLS)
             if value_match and type_match:
                 if pred_rel.symbol['st_shndx'] == 'SHN_ABS' and true_rel.value:
                     if verbose:
@@ -332,8 +335,7 @@ class Comparator:
                 else:
                     # A simple case
                     match += 1
-            elif (pred_rel.value == 'SHN_UNDEF' and type_match and
-                  (true_rel.type_ == RELOC_TYPE_I386.R_386_GOTPC or true_rel.symbol.name in LINKER_GENERATED_SYMBOLS)):
+            elif pred_rel.value == 'SHN_UNDEF' and type_match and allow_undef:
                 # gotpc should be undef
                 match += 1
             elif value_match and true_rel.type_ == RELOC_TYPE_I386.R_386_PLT32 and pred_rel.type_ == RELOC_TYPE_I386.R_386_PC32:
