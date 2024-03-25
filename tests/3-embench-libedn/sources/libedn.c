@@ -1,3 +1,7 @@
+/*
+ * This benchmark was "unstardardized" and all BEEBS calls were replaced back by directly calling libc.
+ * Also, we don't need to run the code in a loop.
+ */
 /* BEEBS edn benchmark
 
    This version, copyright (C) 2014-2019 Embecosm Limited and University of
@@ -33,12 +37,6 @@
  */
 
 #include <string.h>
-#include "support.h"
-
-/* This scale factor will be changed to equalise the runtime of the
-   benchmarks. */
-#define LOCAL_SCALE_FACTOR 87
-
 
 #define N 100
 #define ORDER 50
@@ -197,10 +195,11 @@ codebook (long int mask, long int bitchanged, long int numbasis,
   /*
    * Remove along with the code below.
    *
+   */
+   // Un-removed...
    long int        tmpMask;
 
    tmpMask = mask << 1;
-   */
   for (j = bitchanged + 1; j <= numbasis; j++)
     {
 
@@ -210,13 +209,13 @@ codebook (long int mask, long int bitchanged, long int numbasis,
  * The following code is removed since it gave a memory access exception.
  * It is OK since the return value does not control the flow.
  * The loop always iterates a fixed number of times independent of the loop body.
-
+*/
     if (theta == !(!(codeword & tmpMask)))
 			g += *(d + bitchanged * ddim + j);
 		else
 			g -= *(d + bitchanged * ddim + j);
 		tmpMask <<= 1;
-*/
+//*/
     }
   return g;
 }
@@ -271,29 +270,6 @@ static long int d;
 static int e;
 static long int output[200];
 
-
-void
-initialise_benchmark (void)
-{
-}
-
-
-static int benchmark_body (int  rpt);
-
-void
-warm_caches (int  heat)
-{
-  benchmark_body (heat);
-
-  return;
-}
-
-
-int
-benchmark (void)
-{
-  return benchmark_body (LOCAL_SCALE_FACTOR * CPU_MHZ);
-}
 
 
 static int __attribute__ ((noinline))
@@ -412,6 +388,12 @@ verify_benchmark (int unused)
     && (10243 == c) && (-441886230 == d) && (-441886230 == e);
 }
 
+int
+main (void)
+{
+    benchmark_body (2);
+    return !verify_benchmark(0);
+}
 
 /*
    Local Variables:

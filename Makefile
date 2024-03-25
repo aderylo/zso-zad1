@@ -95,6 +95,7 @@ TARGET ?= all
 
 raw_targets := $(addprefix examples/, a.elf min.elf min_got.elf min_got_harder.elf min_plt.elf)
 stdlib_targets := $(addprefix examples/, b.elf min_libc.elf min_libc_plt.elf min_libc_constructors.elf tricky.elf iotbench.elf question.elf)
+stdlib_targets += tests/3-embench-libedn/sources/libedn.elf
 all_targets := $(raw_targets) $(stdlib_targets)
 
 plt_targets := examples/min_plt.elf examples/min_libc_plt.elf
@@ -144,6 +145,8 @@ examples/question.part: CFLAGS += $(SIMPLE_PIC)
 examples/mi%.part: CFLAGS += -Os
 
 #examples/tricky.elf: CFLAGS += -DFULL_TEST_VERSION
+
+tests/3-embench-libedn/sources/libedn.part:  CFLAGS += $(NOTHING) -O1 -fomit-frame-pointer
 
 %.elf: %.part
 	@echo Linking with ld version ${LD_VERSION} through gcc
