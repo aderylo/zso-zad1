@@ -2,75 +2,85 @@
 #include <set>
 #include <map>
 #include <elfio/elfio.hpp>
+#include <section_utils.hpp>
+#include <symbol_utils.hpp>
 #include <algorithm>
 #include <utils.hpp>
 
 using namespace ELFIO;
 
-section* get_section_by_name( const elfio& elf_file, const std::string& name )
-{
-    for ( int j = 0; j < elf_file.sections.size(); j++ ) {
-        section* psec = elf_file.sections[j];
-        if ( psec->get_name() == name )
-            return psec;
-    }
-
-    return nullptr;
-}
+#define print( x ) std::cout << ( x ) << std::endl
 
 bool parse_text_section( const elfio& src, elfio& dst )
 {
-    section*                text_sec = get_section_by_name( src, ".text" );
-    section*                sym_sec  = utils::get_sections_by_type( src, SHT_SYMTAB ).front();
-    symbol_section_accessor src_sym_acc( src, sym_sec );
+    auto text_sections = utils::get_sections_by_flags( src, SHF_ALLOC | SHF_EXECINSTR );
+    auto sym_sections  = utils::get_sections_by_type( src, SHT_SYMTAB );
 
-    Elf64_Addr start  = text_sec->get_address();
-    Elf64_Addr end    = text_sec->get_address() + text_sec->get_size();
-    Elf64_Addr offset = 0;
+    for ( auto text_sec : text_sections ) {
+        Elf64_Addr start  = text_sec->get_address();
+        Elf64_Addr end    = text_sec->get_address() + text_sec->get_size();
+        Elf64_Addr offset = 0, chunk_size = 0;
 
-    // get all symbols that point to something in .text section
-    std::vector<utils::Symbol> src_syms_in_text =
-        utils::get_symbols_in_range( src_sym_acc, start, end );
+        section*       new_sec;
+        utils::Section new_sec_hdr;
+        new_sec_hdr.type      = SHT_PROGBITS;
+        new_sec_hdr.flags     = ( SHF_ALLOC | SHF_EXECINSTR );
+        new_sec_hdr.link      = 0x0;
+        new_sec_hdr.addralign = text_sec->get_addr_align();
+        new_sec_hdr.entsize   = text_sec->get_entry_size();
 
-    // srot symbols by their virutal address
-    std::sort( src_syms_in_text.begin(), src_syms_in_text.end(),
-               []( const utils::Symbol& a, const utils::Symbol& b ) { return a.value < b.value; } );
+        // get all function symbols that point to contents of the section
+        std::vector<utils::Symbol> symbols;
 
-    std::cout << src_syms_in_text.size() << std::endl;
+        auto processSymSection = [&]( auto& sym_sec, std::vector<utils::Symbol>& result ) {
+            symbol_section_accessor sym_sec_acc( src, sym_sec );
+            auto                    sv = utils::get_symtab_view( sym_sec_acc );
+            sv                         = utils::filter_symtab_view_by_range( sv, start, end );
+            sv                         = utils::filter_symtab_view_by_type( sv, STT_FUNC );
+            std::copy_if( sv.begin(), sv.end(), std::back_inserter( result ),
+                          []( const utils::Symbol& sym ) { return sym.size != 0; } );
+        };
+        std::for_each( sym_sections.begin(), sym_sections.end(),
+                       [&]( auto& sym_section ) { processSymSection( sym_section, symbols ); } );
+        std::sort( symbols.begin(), symbols.end(),
+                   []( const utils::Symbol& a, const utils::Symbol& b ) {
+                       return ( a.value == b.value ) ? ( a.size > b.size ) : ( a.value < b.value );
+                   } );
 
-    for ( auto sym : src_syms_in_text ) {
-        section*    new_sec;
-        std::string new_sec_name;
-        size_t      offset_into_text, new_sec_size;
+        // disect .text into functions
+        for ( auto sym : symbols ) {
+            if ( sym.size == 0 )
+                continue;
 
-        if ( start + offset < sym.value ) {
-            // add whatever is before this symbol
-            section* new_sec = dst.sections.add( ".text" + std::to_string( start + offset ) + "f" );
-            utils::configure_section_header(
-                new_sec, SHT_PROGBITS, text_sec->get_flags(), text_sec->get_address(),
-                text_sec->get_link(), text_sec->get_addr_align(), text_sec->get_entry_size() );
+            if ( ( start + offset ) < sym.value ) {
+                // add empty space before symbol refrence
+                new_sec_hdr.name = ".text." + std::to_string( start + offset );
+                new_sec_hdr.addr = ( start + offset );
+                chunk_size       = sym.value - ( start + offset );
 
-            new_sec->set_data( text_sec->get_data() + offset, sym.value - ( start + offset ) );
+                new_sec = utils::add_section( dst, new_sec_hdr );
+                new_sec->set_data( text_sec->get_data() + offset, chunk_size );
+                offset += chunk_size;
+            }
+
+            if ( start + offset == sym.value ) {
+                // add function, if statement guards against adding same fun twice
+                new_sec_hdr.name = ".text." + sym.name;
+                new_sec_hdr.addr = sym.value;
+
+                new_sec = utils::add_section( dst, new_sec_hdr );
+                new_sec->set_data( text_sec->get_data() + offset, sym.size );
+                offset += sym.size;
+            }
         }
 
-        // add section for the symbol
-        section* new_sec2 = dst.sections.add( ".text." + sym.name );
-        utils::configure_section_header( new_sec2, SHT_PROGBITS, text_sec->get_flags(),
-                                         text_sec->get_address(), text_sec->get_link(),
-                                         text_sec->get_addr_align(), text_sec->get_entry_size() );
-
-        new_sec2->set_data( text_sec->get_data() + sym.value - start, sym.size );
-        offset = sym.value - start + sym.size;
-    }
-
-    if ( start + offset < end ) {
-        // add whatever is leftover
-        section* new_sec3 = dst.sections.add( ".text." + start );
-        utils::configure_section_header( new_sec3, SHT_PROGBITS, text_sec->get_flags(),
-                                         text_sec->get_address(), text_sec->get_link(),
-                                         text_sec->get_addr_align(), text_sec->get_entry_size() );
-
-        new_sec3->set_data( text_sec->get_data() + offset, end - ( start + offset ) );
+        if ( start + offset < end ) {
+            // add leftovers
+            new_sec_hdr.name = ".text." + std::to_string( start + offset );
+            new_sec_hdr.addr = start + offset;
+            new_sec          = utils::add_section( dst, new_sec_hdr );
+            new_sec->set_data( text_sec->get_data() + offset, end - ( start + offset ) );
+        }
     }
 
     return true;
