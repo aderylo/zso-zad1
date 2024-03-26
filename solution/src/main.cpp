@@ -20,7 +20,7 @@ bool disect_section_template( elfio&                     dst,
     Elf64_Addr start  = src_sec->get_address();
     Elf64_Addr end    = src_sec->get_address() + src_sec->get_size();
     Elf64_Addr offset = 0, chunk_size = 0;
-    section *new_sec;
+    section*   new_sec;
 
     for ( auto sym : symbols ) {
         if ( sym.size == 0 )
@@ -37,7 +37,7 @@ bool disect_section_template( elfio&                     dst,
             offset += chunk_size;
         }
 
-        if ( start + offset == sym.value ) { // add function
+        if ( start + offset == sym.value && sym.value + sym.size <= end ) { // add function
             sec_hdr_template.name = sec_name_prefix + sym.name;
             sec_hdr_template.addr = sym.value;
 
@@ -95,7 +95,7 @@ bool parse_text_section( const elfio& src, elfio& dst )
                    } );
 
         // disect .text into functions
-        disect_section_template(dst, text_sec, new_sec_hdr, ".text.", symbols);
+        disect_section_template( dst, text_sec, new_sec_hdr, ".text.", symbols );
     }
 
     return true;
@@ -107,9 +107,8 @@ void parse_rodata_sections( const elfio& src, elfio& dst )
     auto sym_sections    = utils::get_sections_by_type( src, SHT_SYMTAB );
 
     for ( auto rodata_sec : rodata_sections ) {
-        Elf64_Addr start  = rodata_sec->get_address();
-        Elf64_Addr end    = rodata_sec->get_address() + rodata_sec->get_size();
-        Elf64_Addr offset = 0, chunk_size = 0;
+        Elf64_Addr start = rodata_sec->get_address();
+        Elf64_Addr end   = rodata_sec->get_address() + rodata_sec->get_size();
 
         section*       new_sec;
         utils::Section new_sec_hdr;
@@ -137,7 +136,72 @@ void parse_rodata_sections( const elfio& src, elfio& dst )
                    } );
 
         // disect .rodata into functions
-        disect_section_template(dst, rodata_sec, new_sec_hdr, ".rodata.", symbols);
+        disect_section_template( dst, rodata_sec, new_sec_hdr, ".rodata.", symbols );
+    }
+}
+
+void parse_data_sections( const elfio& src, elfio& dst )
+{
+    auto data_sections = utils::get_sections_by_regex( src, ".*data.*" );
+    auto sym_sections  = utils::get_sections_by_type( src, SHT_SYMTAB );
+
+    for ( auto data_sec : data_sections ) {
+        if ( data_sec->get_flags() != ( SHF_ALLOC | SHF_WRITE ) ||
+             data_sec->get_type() != SHT_PROGBITS )
+            continue;
+
+        print( data_sec->get_name() );
+
+        Elf64_Addr start = data_sec->get_address();
+        Elf64_Addr end   = data_sec->get_address() + data_sec->get_size();
+
+        section*       new_sec;
+        utils::Section new_sec_hdr;
+        new_sec_hdr.type      = SHT_PROGBITS;
+        new_sec_hdr.flags     = data_sec->get_flags();
+        new_sec_hdr.link      = 0x0;
+        new_sec_hdr.addralign = data_sec->get_addr_align();
+        new_sec_hdr.entsize   = data_sec->get_entry_size();
+
+        // get all symbols that point to functions in exectuable sections
+        std::vector<utils::Symbol> symbols;
+
+        auto processSymSection = [&]( auto& sym_sec, std::vector<utils::Symbol>& result ) {
+            symbol_section_accessor sym_sec_acc( src, sym_sec );
+            auto                    sv = utils::get_symtab_view( sym_sec_acc );
+            sv                         = utils::filter_symtab_view_by_range( sv, start, end );
+            std::copy_if( sv.begin(), sv.end(), std::back_inserter( result ),
+                          []( const utils::Symbol& sym ) { return sym.size != 0; } );
+        };
+        std::for_each( sym_sections.begin(), sym_sections.end(),
+                       [&]( auto& sym_section ) { processSymSection( sym_section, symbols ); } );
+        std::sort( symbols.begin(), symbols.end(),
+                   []( const utils::Symbol& a, const utils::Symbol& b ) {
+                       return ( a.value == b.value ) ? ( a.size > b.size ) : ( a.value < b.value );
+                   } );
+
+        // disect .rodata into functions
+        disect_section_template( dst, data_sec, new_sec_hdr, ".data.", symbols );
+    }
+}
+
+void parse_bss_sections( const elfio& src, elfio& dst )
+{
+    auto bss_sections = utils::get_sections_by_regex( src, ".*bss.*" );
+
+    for ( auto bss_sec : bss_sections ) {
+        section*       new_sec;
+        utils::Section new_sec_hdr;
+        new_sec_hdr.name      = bss_sec->get_name();
+        new_sec_hdr.type      = SHT_NOBITS;
+        new_sec_hdr.flags     = bss_sec->get_flags();
+        new_sec_hdr.link      = 0x0;
+        new_sec_hdr.addralign = bss_sec->get_addr_align();
+        new_sec_hdr.entsize   = bss_sec->get_entry_size();
+        new_sec_hdr.addr      = bss_sec->get_address();
+
+        new_sec = utils::add_section( dst, new_sec_hdr );
+        new_sec->set_size( bss_sec->get_size() );
     }
 }
 
@@ -179,6 +243,8 @@ int main( int argc, char** argv )
 
     parse_text_section( reader, writer );
     parse_rodata_sections( reader, writer );
+    parse_data_sections( reader, writer );
+    parse_bss_sections( reader, writer );
 
     writer.save( "./result.elf" );
 

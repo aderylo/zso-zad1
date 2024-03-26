@@ -1,3 +1,5 @@
+#include <regex>
+#include <string>
 #include <elfio/elfio.hpp>
 
 using namespace ELFIO;
@@ -29,15 +31,18 @@ section* add_section( elfio& elf_file, const Section& sec_hdr )
     return psec;
 }
 
-section* get_section_by_name( const elfio& elf_file, const std::string& name )
+std::vector<section*> get_sections_by_regex( const elfio& elf_file, const std::string& pattern_str )
 {
-    for ( int j = 0; j < elf_file.sections.size(); j++ ) {
+    std::vector<section*> result;
+    std::regex            pattern( pattern_str );
+
+    for ( int j = 0; j < elf_file.sections.size(); ++j ) {
         section* psec = elf_file.sections[j];
-        if ( psec->get_name() == name )
-            return psec;
+        if ( std::regex_match( psec->get_name(), pattern ) )
+            result.push_back( psec );
     }
 
-    return nullptr;
+    return result;
 }
 
 std::vector<section*> get_sections_by_type( const elfio& elf_file, Elf_Word type )
@@ -70,4 +75,4 @@ std::vector<section*> get_sections_by_flags( const elfio& elf_file, Elf_Xword fl
     return result;
 }
 
-} // utils
+} // namespace utils
