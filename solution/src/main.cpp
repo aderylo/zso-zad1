@@ -2,32 +2,79 @@
 #include <set>
 #include <map>
 #include <elfio/elfio.hpp>
+#include <algorithm>
 #include <utils.hpp>
 
 using namespace ELFIO;
 
-struct mapping
+section* get_section_by_name( const elfio& elf_file, const std::string& name )
 {
-    std::map<int, int> forward;
-    std::map<int, int> backward;
-
-    void swap_values( int fst, int snd )
-    {
-        int inv_fst = backward[fst];
-        int inv_snd = backward[snd];
-
-        forward[inv_fst] = snd;
-        forward[inv_snd] = fst;
-        backward[fst]    = inv_snd;
-        backward[snd]    = inv_fst;
+    for ( int j = 0; j < elf_file.sections.size(); j++ ) {
+        section* psec = elf_file.sections[j];
+        if ( psec->get_name() == name )
+            return psec;
     }
 
-    void insert( int key, int val )
-    {
-        forward[key]  = val;
-        backward[val] = key;
+    return nullptr;
+}
+
+bool parse_text_section( const elfio& src, elfio& dst )
+{
+    section*                text_sec = get_section_by_name( src, ".text" );
+    section*                sym_sec  = utils::get_sections_by_type( src, SHT_SYMTAB ).front();
+    symbol_section_accessor src_sym_acc( src, sym_sec );
+
+    Elf64_Addr start  = text_sec->get_address();
+    Elf64_Addr end    = text_sec->get_address() + text_sec->get_size();
+    Elf64_Addr offset = 0;
+
+    // get all symbols that point to something in .text section
+    std::vector<utils::Symbol> src_syms_in_text =
+        utils::get_symbols_in_range( src_sym_acc, start, end );
+
+    // srot symbols by their virutal address
+    std::sort( src_syms_in_text.begin(), src_syms_in_text.end(),
+               []( const utils::Symbol& a, const utils::Symbol& b ) { return a.value < b.value; } );
+
+    std::cout << src_syms_in_text.size() << std::endl;
+
+    for ( auto sym : src_syms_in_text ) {
+        section*    new_sec;
+        std::string new_sec_name;
+        size_t      offset_into_text, new_sec_size;
+
+        if ( start + offset < sym.value ) {
+            // add whatever is before this symbol
+            section* new_sec = dst.sections.add( ".text" + std::to_string( start + offset ) + "f" );
+            utils::configure_section_header(
+                new_sec, SHT_PROGBITS, text_sec->get_flags(), text_sec->get_address(),
+                text_sec->get_link(), text_sec->get_addr_align(), text_sec->get_entry_size() );
+
+            new_sec->set_data( text_sec->get_data() + offset, sym.value - ( start + offset ) );
+        }
+
+        // add section for the symbol
+        section* new_sec2 = dst.sections.add( ".text." + sym.name );
+        utils::configure_section_header( new_sec2, SHT_PROGBITS, text_sec->get_flags(),
+                                         text_sec->get_address(), text_sec->get_link(),
+                                         text_sec->get_addr_align(), text_sec->get_entry_size() );
+
+        new_sec2->set_data( text_sec->get_data() + sym.value - start, sym.size );
+        offset = sym.value - start + sym.size;
     }
-};
+
+    if ( start + offset < end ) {
+        // add whatever is leftover
+        section* new_sec3 = dst.sections.add( ".text." + start );
+        utils::configure_section_header( new_sec3, SHT_PROGBITS, text_sec->get_flags(),
+                                         text_sec->get_address(), text_sec->get_link(),
+                                         text_sec->get_addr_align(), text_sec->get_entry_size() );
+
+        new_sec3->set_data( text_sec->get_data() + offset, end - ( start + offset ) );
+    }
+
+    return true;
+}
 
 int main( int argc, char** argv )
 {
@@ -50,7 +97,7 @@ int main( int argc, char** argv )
     writer.set_os_abi( reader.get_os_abi() );
     writer.set_type( ET_REL );
     writer.set_machine( reader.get_machine() );
-    writer.set_entry(0x0);
+    writer.set_entry( 0x0 );
 
     section* old_symtab_sec = utils::get_sections_by_type( reader, SHT_SYMTAB ).front();
     section* new_strtab_sec = writer.sections.add( ".strtab" );
@@ -65,123 +112,7 @@ int main( int argc, char** argv )
     symbol_section_accessor new_symbols( writer, new_symtab_sec );
     string_section_accessor new_strings( new_strtab_sec );
 
-    mapping symbol_map;
-
-    // copy symbols that point to non zero objects and create sections for them
-    for ( int idx = 0; idx < old_symbols.get_symbols_num(); idx++ ) {
-        utils::Symbol old_sym;
-        utils::get_symbol_wrapper( old_symbols, idx, old_sym );
-
-        if ( old_sym.section_index == SHN_UNDEF || old_sym.section_index == SHN_ABS )
-            continue;
-        section* old_sec = reader.sections[old_sym.section_index];
-        section* new_sec = writer.sections.add( old_sec->get_name() + "." + old_sym.name );
-
-        utils::configure_section_header( new_sec, old_sec->get_type(), old_sec->get_flags(),
-                                         old_sec->get_address(), 0x0, old_sec->get_addr_align(),
-                                         old_sec->get_entry_size() );
-
-        if ( old_sym.size > 0 ) {
-            size_t offset_into_old_sec = old_sym.value - old_sec->get_address();
-            new_sec->set_data( old_sec->get_data() + offset_into_old_sec, old_sym.size );
-
-            Elf_Word sym_idx = new_symbols.add_symbol( new_strings,
-                                                       old_sym.name.c_str(), // name
-                                                       old_sym.value,        // offset into section
-                                                       old_sym.size,         // object size
-                                                       old_sym.bind,  // bind type (usualy DEFAULT)
-                                                       old_sym.type,  // type : FUNC | OBJECT
-                                                       old_sym.other, // other
-                                                       new_sec->get_index() );
-
-            symbol_map.insert( idx, sym_idx );
-        }
-    }
-
-    // second pass, add symbols that are purely labels to places in memory
-    for ( int i = 0; i < old_symbols.get_symbols_num(); i++ ) {
-        utils::Symbol old_sym, new_sym;
-        utils::get_symbol_wrapper( old_symbols, i, old_sym );
-
-        if ( old_sym.size == 0 && old_sym.value != 0 ) {
-            for ( int j = 0; j < new_symbols.get_symbols_num(); j++ ) {
-                utils::get_symbol_wrapper( new_symbols, j, new_sym );
-                if ( new_sym.section_index == SHN_UNDEF )
-                    continue;
-
-                if ( old_sym.value >= new_sym.value &&
-                     old_sym.value <= new_sym.value + new_sym.size ) {
-                    Elf64_Addr offset = old_sym.value - new_sym.value;
-
-                    Elf_Word sym_idx =
-                        new_symbols.add_symbol( new_strings,
-                                                old_sym.name.c_str(), // name
-                                                offset,               // offset into section
-                                                old_sym.size,         // object size
-                                                old_sym.bind,         // bind type (usualy DEFAULT)
-                                                old_sym.type,         // type : FUNC | OBJECT
-                                                old_sym.other,        // other
-                                                new_sym.section_index );
-
-                    symbol_map.insert( i, sym_idx );
-                }
-            }
-        }
-    }
-
-    std::function<void( int, int )> f = [&symbol_map]( int x, int y ) {
-        symbol_map.swap_values( x, y );
-    };
-    new_symbols.arrange_local_symbols( f );
-
-    // Relocs
-    auto old_rel_sections  = utils::get_sections_by_type( reader, SHT_REL );
-    auto old_rela_sections = utils::get_sections_by_type( reader, SHT_RELA );
-
-    size_t non_rel_section_count = writer.sections.size();
-    for ( int sec_idx = 0; sec_idx < non_rel_section_count; sec_idx++ ) {
-        section* psec = writer.sections[sec_idx];
-
-        if ( psec->get_type() != SHT_PROGBITS )
-            continue;
-
-        section* new_rel_sec = writer.sections.add( ".rel" + psec->get_name() );
-        utils::configure_section_header( new_rel_sec, SHT_REL, SHF_INFO_LINK, 0x0,
-                                         new_symtab_sec->get_index(), 0x4, 0x8 );
-                                         new_rel_sec->set_info(sec_idx);
-        relocation_section_accessor new_rel_acc( writer, new_rel_sec );
-
-        for ( auto old_rel_sec : old_rel_sections ) {
-            relocation_section_accessor old_rel_acc( reader, old_rel_sec );
-            for ( int rel_idx = 0; rel_idx < old_rel_acc.get_entries_num(); rel_idx++ ) {
-
-                utils::Relocation old_rel;
-                utils::get_entry_wrapper( old_rel_acc, rel_idx, old_rel );
-
-                if ( psec->get_address() <= old_rel.offset &&
-                     old_rel.offset <= psec->get_address() + psec->get_size() ) {
-                    // relocation applies to current section
-                    Elf64_Addr offset = old_rel.offset - psec->get_address();
-                    // we need to get symbol the new relocation is ought to be pointing to;
-                    Elf_Word new_sym_idx = symbol_map.forward[old_rel.symbol];
-
-                    if ( old_rel.type == R_386_32 ) { // S + A
-                        new_rel_acc.add_entry( offset, new_sym_idx, old_rel.type, old_rel.addend );
-                    }
-                }
-            }
-        }
-    }
-
-    // zero out value of object/func symbols since they point to begining of their sections
-    // and we do not need their original virtual address anymore
-    for ( int sym_idx = 0; sym_idx < new_symbols.get_symbols_num(); sym_idx++ ) {
-        utils::Symbol sym;
-        utils::get_symbol_wrapper( new_symbols, sym_idx, sym );
-        if ( sym.size > 0 ) {
-            sym.value = 0x0;
-        }
-    }
+    parse_text_section( reader, writer );
 
     writer.save( "./result.elf" );
 
