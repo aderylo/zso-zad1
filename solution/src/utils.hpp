@@ -42,6 +42,22 @@ bool get_symbol_wrapper( const symbol_section_accessor& accessor,
                                 symbolInfo.other );
 }
 
+Elf_Xword get_symbol_by_refrence( const symbol_section_accessor& accessor,
+                                  Elf64_Addr                     value,
+                                  Elf_Xword                      size,
+                                  Symbol&                        symbol )
+{
+    for ( int i = 0; i < accessor.get_symbols_num(); i++ ) {
+        get_symbol_wrapper( accessor, i, symbol );
+        if ( symbol.size == size && symbol.value == value ) {
+            return i;
+        }
+    }
+
+    return -1;
+    ;
+}
+
 void configure_section_header( section*   section,
                                Elf_Word   type,
                                Elf_Xword  flags,
