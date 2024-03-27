@@ -288,15 +288,14 @@ void do_relocs( const elfio& src, elfio& dst, section* dst_symtab )
 
             if ( section->get_address() <= old_rel.offset &&
                  section->get_address() + section->get_size() >= old_rel.offset ) {
-                // apply relocation inside a section
 
-                utils::Relocation new_rel;
-                new_rel.offset = old_rel.offset - section->get_address();
-                new_rel.symbol = old_rel.symbol;
-                new_rel.type   = old_rel.type;
-                new_rel.addend = old_rel.addend;
+                new_rel_sec_acc.add_entry(
+                    old_rel.offset - section->get_address(),
+                    old_rel.symbol,
+                    old_rel.type
+                );
 
-                utils::add_relocation( new_rel_sec_acc, new_rel );
+                // utils::add_relocation( new_rel_sec_acc, old_rel );
                 // maybe a bit diffrent depending on the type, think about it
             }
         }
