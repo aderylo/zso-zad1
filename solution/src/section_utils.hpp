@@ -13,6 +13,7 @@ struct Section
     Elf_Xword   flags;
     Elf64_Addr  addr;
     Elf_Word    link;
+    Elf_Word info;
     Elf_Xword   addralign;
     Elf_Xword   entsize;
 };
@@ -27,6 +28,7 @@ section* add_section( elfio& elf_file, const Section& sec_hdr )
     psec->set_link( sec_hdr.link );
     psec->set_addr_align( sec_hdr.addralign );
     psec->set_entry_size( sec_hdr.entsize );
+    psec->set_info(sec_hdr.info);
 
     return psec;
 }
@@ -73,6 +75,22 @@ std::vector<section*> get_sections_by_flags( const elfio& elf_file, Elf_Xword fl
     }
 
     return result;
+}
+
+void configure_section_header( section*   section,
+                               Elf_Word   type,
+                               Elf_Xword  flags,
+                               Elf64_Addr addr,
+                               Elf_Word   link,
+                               Elf_Xword  addralign,
+                               Elf_Xword  entsize )
+{
+    section->set_type( type );
+    section->set_flags( flags );
+    section->set_address( addr );
+    section->set_link( link );
+    section->set_addr_align( addralign );
+    section->set_entry_size( entsize );
 }
 
 } // namespace utils

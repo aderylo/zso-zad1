@@ -7,14 +7,6 @@ using namespace ELFIO;
 
 namespace utils {
 
-struct Relocation
-{
-    Elf64_Addr offset;
-    Elf_Word   symbol;
-    unsigned   type;
-    Elf_Sxword addend;
-};
-
 struct mapping
 {
     std::map<int, int> forward;
@@ -37,12 +29,5 @@ struct mapping
         backward[val] = key;
     }
 };
-
-bool get_entry_wrapper( const relocation_section_accessor& accessor,
-                        Elf_Word                           index,
-                        Relocation&                        entry )
-{
-    return accessor.get_entry( index, entry.offset, entry.symbol, entry.type, entry.addend );
-}
 
 } // namespace utils

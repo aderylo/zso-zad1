@@ -4,6 +4,7 @@
 #include <elfio/elfio.hpp>
 #include <section_utils.hpp>
 #include <symbol_utils.hpp>
+#include <relocation_utils.hpp>
 #include <algorithm>
 #include <utils.hpp>
 
@@ -75,6 +76,7 @@ bool parse_text_section( const elfio& src, elfio& dst )
         new_sec_hdr.link      = 0x0;
         new_sec_hdr.addralign = text_sec->get_addr_align();
         new_sec_hdr.entsize   = text_sec->get_entry_size();
+        new_sec_hdr.info      = 0x0;
 
         // get all symbols that point to functions in exectuable sections
         std::vector<utils::Symbol> symbols;
@@ -117,6 +119,7 @@ void parse_rodata_sections( const elfio& src, elfio& dst )
         new_sec_hdr.link      = 0x0;
         new_sec_hdr.addralign = rodata_sec->get_addr_align();
         new_sec_hdr.entsize   = rodata_sec->get_entry_size();
+        new_sec_hdr.info      = 0x0;
 
         // get all symbols that point to functions in exectuable sections
         std::vector<utils::Symbol> symbols;
@@ -162,6 +165,7 @@ void parse_data_sections( const elfio& src, elfio& dst )
         new_sec_hdr.link      = 0x0;
         new_sec_hdr.addralign = data_sec->get_addr_align();
         new_sec_hdr.entsize   = data_sec->get_entry_size();
+        new_sec_hdr.info      = 0x0;
 
         // get all symbols that point to functions in exectuable sections
         std::vector<utils::Symbol> symbols;
@@ -199,9 +203,103 @@ void parse_bss_sections( const elfio& src, elfio& dst )
         new_sec_hdr.addralign = bss_sec->get_addr_align();
         new_sec_hdr.entsize   = bss_sec->get_entry_size();
         new_sec_hdr.addr      = bss_sec->get_address();
+        new_sec_hdr.info      = 0x0;
 
         new_sec = utils::add_section( dst, new_sec_hdr );
         new_sec->set_size( bss_sec->get_size() );
+    }
+}
+
+void copy_symtab( const elfio&             src,
+                  elfio&                   dst,
+                  symbol_section_accessor& dst_sym_acc,
+                  string_section_accessor& dst_str_acc )
+{
+    auto                       sym_sections = utils::get_sections_by_type( src, SHT_SYMTAB );
+    std::vector<utils::Symbol> symbols;
+
+    // remove symbols to files and linker stuff
+    auto processSymSection = [&]( auto& sym_sec, std::vector<utils::Symbol>& result ) {
+        symbol_section_accessor sym_sec_acc( src, sym_sec );
+        auto                    sv = utils::get_symtab_view( sym_sec_acc );
+        std::copy_if( sv.begin(), sv.end(), std::back_inserter( result ),
+                      []( const utils::Symbol& sym ) { return true; } );
+    };
+    std::for_each( sym_sections.begin(), sym_sections.end(),
+                   [&]( auto& sym_section ) { processSymSection( sym_section, symbols ); } );
+    symbols.erase( symbols.begin() + 0 );
+
+    for ( auto old_sym : symbols ) {
+        if ( old_sym.type != STT_SECTION && old_sym.section_index != SHN_ABS &&
+             old_sym.section_index != SHN_UNDEF ) {
+            for ( int j = 0; j < dst.sections.size(); j++ ) {
+                section* section = dst.sections[j];
+
+                if ( section->get_address() <= old_sym.value &&
+                     section->get_address() + section->get_size() ) {
+                    old_sym.section_index = section->get_index();
+                    old_sym.value = old_sym.value - section->get_address();
+                }
+            }
+        }
+
+        utils::add_symbol( dst_sym_acc, dst_str_acc, old_sym );
+    }
+
+    dst_sym_acc.arrange_local_symbols();
+}
+
+void do_relocs( const elfio& src, elfio& dst, section* dst_symtab )
+{
+    auto                           sections         = utils::get_sections_by_regex( dst, ".*" );
+    auto                           old_rel_sections = utils::get_sections_by_type( src, SHT_REL );
+    std::vector<utils::Relocation> old_all_relocs;
+
+    auto processRelSection = [&]( auto& rel_sec, std::vector<utils::Relocation> &all_relocs ) {
+        relocation_section_accessor rel_sec_acc( src, rel_sec );
+        auto                        rv = utils::get_reltab_view( rel_sec_acc );
+        std::copy( rv.begin(), rv.end(), std::back_inserter( all_relocs ) );
+    };
+    std::for_each( old_rel_sections.begin(), old_rel_sections.end(),
+                   [&]( auto& rel_sec ) { processRelSection( rel_sec, old_all_relocs ); } );
+
+    for ( auto section : sections ) {
+        if ( section->get_type() != SHT_PROGBITS ) {
+            continue;
+        }
+
+        utils::Section new_rel_sec;
+        new_rel_sec.addr      = 0x0;
+        new_rel_sec.addralign = 0x4;
+        new_rel_sec.entsize   = 0x8;
+        new_rel_sec.flags     = SHF_INFO_LINK;
+        new_rel_sec.type      = SHT_REL;
+        new_rel_sec.name      = ".rel" + section->get_name();
+        new_rel_sec.link      = dst_symtab->get_index();
+        new_rel_sec.info      = section->get_index();
+
+        auto                        new_rel_sec_ptr = utils::add_section( dst, new_rel_sec );
+        relocation_section_accessor new_rel_sec_acc( dst, new_rel_sec_ptr );
+
+        for ( auto old_rel : old_all_relocs ) {
+            if (old_rel.type != R_386_32)
+                continue;
+
+
+            if ( section->get_address() <= old_rel.offset &&
+                 section->get_address() + section->get_size() >= old_rel.offset ) {
+                // apply relocation inside a section
+
+                utils::Relocation new_rel;
+                new_rel.offset = old_rel.offset - section->get_address();
+                new_rel.symbol = old_rel.symbol;
+                new_rel.type   = old_rel.type;
+                new_rel.addend = old_rel.addend;
+
+                utils::add_relocation( new_rel_sec_acc, new_rel );
+                // maybe a bit diffrent depending on the type, think about it
+            }
+        }
     }
 }
 
@@ -245,6 +343,8 @@ int main( int argc, char** argv )
     parse_rodata_sections( reader, writer );
     parse_data_sections( reader, writer );
     parse_bss_sections( reader, writer );
+    copy_symtab( reader, writer, new_symbols, new_strings );
+    do_relocs( reader, writer, new_symtab_sec );
 
     writer.save( "./result.elf" );
 

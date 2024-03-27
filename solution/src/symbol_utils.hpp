@@ -18,6 +18,14 @@ struct Symbol
     unsigned char other;
 };
 
+bool add_symbol( symbol_section_accessor& sym_acc,
+                 string_section_accessor& str_acc,
+                 const Symbol&            symbol )
+{
+    return sym_acc.add_symbol( str_acc, symbol.name.c_str(), symbol.value, symbol.size, symbol.bind,
+                               symbol.type, symbol.other, symbol.section_index );
+}
+
 bool get_symbol_by_idx( const symbol_section_accessor& accessor, Elf_Xword index, Symbol& symbol )
 {
     return accessor.get_symbol( index, symbol.name, symbol.value, symbol.size, symbol.bind,
@@ -54,9 +62,7 @@ std::vector<Symbol> filter_symtab_view_by_type( const std::vector<Symbol>& symta
                                                 unsigned char              type )
 {
     std::vector<Symbol> res;
-    auto                isInRange = [type]( Symbol s ) {
-        return ( s.type == type);
-    };
+    auto                isInRange = [type]( Symbol s ) { return ( s.type == type ); };
 
     std::copy_if( symtab_view.begin(), symtab_view.end(), std::back_inserter( res ), isInRange );
     return res;
@@ -77,22 +83,6 @@ std::vector<Symbol> get_symtab_view_in_range( const symbol_section_accessor& acc
     }
 
     return result;
-}
-
-void configure_section_header( section*   section,
-                               Elf_Word   type,
-                               Elf_Xword  flags,
-                               Elf64_Addr addr,
-                               Elf_Word   link,
-                               Elf_Xword  addralign,
-                               Elf_Xword  entsize )
-{
-    section->set_type( type );
-    section->set_flags( flags );
-    section->set_address( addr );
-    section->set_link( link );
-    section->set_addr_align( addralign );
-    section->set_entry_size( entsize );
 }
 
 } // namespace utils
