@@ -153,8 +153,10 @@ void create_relocs( const elfio& src, elfio& dst, section* dst_symtab, section* 
     auto dst_strtab_acc = string_section_accessor( dst_strtab );
 
     for ( auto fun_sec : fun_sections ) {
-        Elf64_Addr fn_start    = fun_sec->get_address();
-        Elf64_Addr fn_end      = fn_start + fun_sec->get_size();
+        Elf64_Addr text_start = fun_sections.front()->get_address();
+        Elf64_Addr text_end = fun_sections.back()->get_address() + fun_sections.back()->get_size();
+        Elf64_Addr fn_start = fun_sec->get_address();
+        Elf64_Addr fn_end   = fn_start + fun_sec->get_size();
         auto       new_rel_sec = utils::add_rel_section( dst, ".rel" + fun_sec->get_name(),
                                                          dst_symtab->get_index(), fun_sec->get_index() );
         auto       new_rel_acc = relocation_section_accessor( dst, new_rel_sec );
@@ -172,12 +174,10 @@ void create_relocs( const elfio& src, elfio& dst, section* dst_symtab, section* 
             // resolve relocation to get address
             auto src_symbol = src_symtab_view[src_rel.symbol];
             auto virt_addr  = src_symbol.value;
-            std::cout << "x";
-            std::cout << virt_addr << std::endl;
+            std::cout << src_symbol.name << std::endl;
 
             if ( is_addr_inside_function( src, virt_addr ) ) {
                 // find called function in new file
-                std::cout << "h";
                 std::cout << virt_addr << std::endl;
                 section* called_fn;
                 auto     x = utils::get_sections_containing_addr( dst, virt_addr );
@@ -210,6 +210,52 @@ void create_relocs( const elfio& src, elfio& dst, section* dst_symtab, section* 
                 new_rel_acc.add_entry( new_rel_entry.offset, new_rel_entry.symbol,
                                        new_rel_entry.type );
             }
+
+            if ( utils::classify_pointer( src, text_start, text_end, virt_addr ) ==
+                 utils::PointerClass::RODATA_OR_GOT ) {
+                // idk how to handle GOT for now
+
+                // create rodata section, symbol and point to it
+
+                std::cout << "dupa" << std::endl; // i never hit that
+
+                utils::Section sec_hdr;
+                sec_hdr.addr      = 0x0;
+                sec_hdr.addralign = 0x4;
+                sec_hdr.entsize   = 0x0;
+                sec_hdr.flags     = ( SHF_ALLOC );
+                sec_hdr.info      = 0x0;
+                sec_hdr.name      = ".rodata." + std::to_string( virt_addr ) + "r";
+                sec_hdr.type      = SHT_PROGBITS;
+
+                auto new_sec = utils::add_section( dst, sec_hdr );
+
+                utils::Symbol new_sym;
+                new_sym.value         = 0x0;
+                new_sym.name          = std::to_string( virt_addr ) + "r";
+                new_sym.bind          = STB_LOCAL;
+                new_sym.section_index = new_sec->get_index();
+                new_sym.size          = src_symbol.size; // bit of cheating
+                new_sym.type          = STT_OBJECT;
+                new_sym.other         = STV_DEFAULT;
+
+                auto sidx = utils::add_symbol( dst_symtab_acc, dst_strtab_acc, new_sym );
+
+                // crate relocaton to this symbol
+                utils::Relocation new_rel_entry;
+                new_rel_entry.offset = src_rel.offset - fn_start;
+                new_rel_entry.type   = src_rel.type;
+                new_rel_entry.symbol = sidx;
+
+                new_rel_acc.add_entry( new_rel_entry.offset, new_rel_entry.symbol,
+                                       new_rel_entry.type );
+            }
+
+
+            if ( utils::classify_pointer( src, text_start, text_end, virt_addr ) ==
+                 utils::PointerClass::BSS_OR_STACK ){
+                    // handle stack, should be easy
+                 }
         }
     }
 }
