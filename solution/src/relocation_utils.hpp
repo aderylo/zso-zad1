@@ -15,9 +15,9 @@ struct Relocation
     Elf_Sxword addend;
 };
 
-void add_relocation( relocation_section_accessor& accessor, Relocation new_reloc )
+void add_rel_entry( relocation_section_accessor& accessor, Relocation new_reloc )
 {
-    accessor.add_entry( new_reloc.offset, new_reloc.symbol, new_reloc.type, new_reloc.addend );
+    accessor.add_entry( new_reloc.offset, new_reloc.symbol, new_reloc.type );
 }
 
 bool get_relocation_by_idx( const relocation_section_accessor& accessor,

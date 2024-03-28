@@ -76,11 +76,14 @@ PointerClass classify_pointer( const elfio& elf_file,
             if ( start <= addr && addr <= end ) {
                 // @TODO: implement point scoring system instead of branching logic
 
-                if ( j == 0 && text_start <= addr && addr <= text_end )
-                    return TEXT;
-
-                if ( j == 0 && addr >= text_end )
-                    return RODATA_OR_GOT;
+                if ( j == 0 ) {
+                    if ( text_start <= addr && addr < text_end )
+                        return TEXT;
+                    else if ( addr == text_end )
+                        return TEXT; // that will depend on the instruction before (call/jump vs mov/sub/..)
+                    else
+                        return RODATA_OR_GOT;
+                }
 
                 if ( j == 1 && segment->get_memory_size() > 0 && segment->get_file_size() == 0 )
                     return BSS_OR_STACK;
