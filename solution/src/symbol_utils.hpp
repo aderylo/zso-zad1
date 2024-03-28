@@ -19,11 +19,78 @@ struct Symbol
 };
 
 Elf_Word add_symbol( symbol_section_accessor& sym_acc,
-                 string_section_accessor& str_acc,
-                 const Symbol&            symbol )
+                     string_section_accessor& str_acc,
+                     const Symbol&            symbol )
 {
     return sym_acc.add_symbol( str_acc, symbol.name.c_str(), symbol.value, symbol.size, symbol.bind,
                                symbol.type, symbol.other, symbol.section_index );
+}
+
+Elf_Word add_function_symbol( symbol_section_accessor& sym_acc,
+                              string_section_accessor& str_acc,
+                              section*                 fn_section )
+{
+    utils::Symbol fn_symbol;
+    fn_symbol.value         = 0x0;
+    fn_symbol.name          = fn_section->get_name();
+    fn_symbol.bind          = STB_GLOBAL;
+    fn_symbol.section_index = fn_section->get_index();
+    fn_symbol.size          = fn_section->get_size();
+    fn_symbol.type          = STT_FUNC;
+    fn_symbol.other         = STV_DEFAULT;
+
+    return add_symbol( sym_acc, str_acc, fn_symbol );
+}
+
+Elf_Word add_rodata_symbol( symbol_section_accessor& sym_acc,
+                            string_section_accessor& str_acc,
+                            Elf64_Word               original_addr,
+                            section*                 ro_object_section )
+{
+    utils::Symbol symbol;
+    symbol.value         = 0x0;
+    symbol.name          = std::to_string(original_addr) + "r";
+    symbol.bind          = STB_LOCAL;
+    symbol.section_index = ro_object_section->get_index();
+    symbol.size          = ro_object_section->get_size();
+    symbol.type          = STT_OBJECT;
+    symbol.other         = STV_DEFAULT;
+
+    return add_symbol( sym_acc, str_acc, symbol );
+}
+
+Elf_Word add_bss_symbol( symbol_section_accessor& sym_acc,
+                            string_section_accessor& str_acc,
+                            Elf64_Word               original_addr,
+                            section*                 bss_obj_section )
+{
+    utils::Symbol symbol;
+    symbol.value         = 0x0;
+    symbol.name          = std::to_string(original_addr) + "B";
+    symbol.bind          = STB_GLOBAL;
+    symbol.section_index = bss_obj_section->get_index();
+    symbol.size          = bss_obj_section->get_size();
+    symbol.type          = STT_OBJECT;
+    symbol.other         = STV_DEFAULT;
+
+    return add_symbol( sym_acc, str_acc, symbol );
+}
+
+Elf_Word add_data_symbol( symbol_section_accessor& sym_acc,
+                            string_section_accessor& str_acc,
+                            Elf64_Word               original_addr,
+                            section*                 data_obj_section )
+{
+    utils::Symbol symbol;
+    symbol.value         = 0x0;
+    symbol.name          = std::to_string(original_addr) + "d";
+    symbol.bind          = STB_LOCAL;
+    symbol.section_index = data_obj_section->get_index();
+    symbol.size          = data_obj_section->get_size();
+    symbol.type          = STT_OBJECT;
+    symbol.other         = STV_DEFAULT;
+
+    return add_symbol( sym_acc, str_acc, symbol );
 }
 
 bool get_symbol_by_idx( const symbol_section_accessor& accessor, Elf_Xword index, Symbol& symbol )
