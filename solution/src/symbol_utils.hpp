@@ -2,6 +2,7 @@
 #include <elfio/elfio.hpp>
 #include <set>
 #include <map>
+#include <regex>
 
 using namespace ELFIO;
 
@@ -16,6 +17,8 @@ struct Symbol
     unsigned char type;
     Elf_Half      section_index;
     unsigned char other;
+
+    Elf_Word __symtab_idx;
 };
 
 Elf_Word add_symbol( symbol_section_accessor& sym_acc,
@@ -49,7 +52,7 @@ Elf_Word add_rodata_symbol( symbol_section_accessor& sym_acc,
 {
     utils::Symbol symbol;
     symbol.value         = 0x0;
-    symbol.name          = std::to_string(original_addr) + "r";
+    symbol.name          = std::to_string( original_addr ) + "r";
     symbol.bind          = STB_LOCAL;
     symbol.section_index = ro_object_section->get_index();
     symbol.size          = ro_object_section->get_size();
@@ -60,13 +63,13 @@ Elf_Word add_rodata_symbol( symbol_section_accessor& sym_acc,
 }
 
 Elf_Word add_bss_symbol( symbol_section_accessor& sym_acc,
-                            string_section_accessor& str_acc,
-                            Elf64_Word               original_addr,
-                            section*                 bss_obj_section )
+                         string_section_accessor& str_acc,
+                         Elf64_Word               original_addr,
+                         section*                 bss_obj_section )
 {
     utils::Symbol symbol;
     symbol.value         = 0x0;
-    symbol.name          = std::to_string(original_addr) + "B";
+    symbol.name          = std::to_string( original_addr ) + "B";
     symbol.bind          = STB_GLOBAL;
     symbol.section_index = bss_obj_section->get_index();
     symbol.size          = bss_obj_section->get_size();
@@ -77,13 +80,13 @@ Elf_Word add_bss_symbol( symbol_section_accessor& sym_acc,
 }
 
 Elf_Word add_data_symbol( symbol_section_accessor& sym_acc,
-                            string_section_accessor& str_acc,
-                            Elf64_Word               original_addr,
-                            section*                 data_obj_section )
+                          string_section_accessor& str_acc,
+                          Elf64_Word               original_addr,
+                          section*                 data_obj_section )
 {
     utils::Symbol symbol;
     symbol.value         = 0x0;
-    symbol.name          = std::to_string(original_addr) + "d";
+    symbol.name          = std::to_string( original_addr ) + "d";
     symbol.bind          = STB_LOCAL;
     symbol.section_index = data_obj_section->get_index();
     symbol.size          = data_obj_section->get_size();
@@ -106,6 +109,7 @@ std::vector<Symbol> get_symtab_view( const symbol_section_accessor& accessor )
 
     for ( int j = 0; j < accessor.get_symbols_num(); j++ ) {
         get_symbol_by_idx( accessor, j, symbol );
+        symbol.__symtab_idx = j;
         res.push_back( symbol );
     }
 
@@ -129,9 +133,20 @@ std::vector<Symbol> filter_symtab_view_by_type( const std::vector<Symbol>& symta
                                                 unsigned char              type )
 {
     std::vector<Symbol> res;
-    auto                isInRange = [type]( Symbol s ) { return ( s.type == type ); };
+    auto                isOfType = [type]( Symbol s ) { return ( s.type == type ); };
 
-    std::copy_if( symtab_view.begin(), symtab_view.end(), std::back_inserter( res ), isInRange );
+    std::copy_if( symtab_view.begin(), symtab_view.end(), std::back_inserter( res ), isOfType );
+    return res;
+}
+
+std::vector<Symbol> filter_symtab_view_by_regex( const std::vector<Symbol>& symtab_view,
+                                                 const std::string&         pattern_str )
+{
+    std::vector<Symbol> res;
+    std::regex          pattern( pattern_str );
+    auto nameMatches = [pattern]( Symbol s ) { return ( std::regex_match( s.name, pattern ) ); };
+
+    std::copy_if( symtab_view.begin(), symtab_view.end(), std::back_inserter( res ), nameMatches );
     return res;
 }
 
