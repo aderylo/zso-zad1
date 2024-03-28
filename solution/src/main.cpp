@@ -204,7 +204,7 @@ void create_relocs( const elfio& src, elfio& dst, section* dst_symtab, section* 
                                   << fun_sec->get_name();
                 }
 
-                new_rel_acc.add_entry( src_rel.offset - fn_start, symtab_idx, src_rel.type );
+                new_rel_acc.add_entry( src_rel.offset - fn_start, symtab_idx, R_386_32 );
             }
 
             if ( ptr_class == utils::RODATA_OR_GOT ) {
@@ -236,7 +236,7 @@ void create_relocs( const elfio& src, elfio& dst, section* dst_symtab, section* 
                 // crate relocaton to this symbol
                 utils::Relocation new_rel_entry;
                 new_rel_entry.offset = src_rel.offset - fn_start;
-                new_rel_entry.type   = src_rel.type;
+                new_rel_entry.type   = R_386_32;
                 new_rel_entry.symbol = sidx;
 
                 new_rel_acc.add_entry( new_rel_entry.offset, new_rel_entry.symbol,
@@ -279,8 +279,8 @@ void create_relocs( const elfio& src, elfio& dst, section* dst_symtab, section* 
                 auto sidx = utils::add_symbol( dst_symtab_acc, dst_strtab_acc, new_sym );
 
                 utils::Relocation new_rel_entry;
-                new_rel_entry.offset = src_rel.offset - new_sec->get_address();
-                new_rel_entry.type   = src_rel.type;
+                new_rel_entry.offset = 0x0;
+                new_rel_entry.type   = R_386_32;
                 new_rel_entry.symbol = sidx;
 
                 new_rel_acc.add_entry( new_rel_entry.offset, new_rel_entry.symbol,
@@ -319,6 +319,33 @@ void fix_symtab( elfio& dst, section* dst_symtab, section* dst_strtab )
     }
 }
 
+void establish_entry_point( elfio& dst, section* dst_symtab, section* dst_strtab )
+{
+    symbol_section_accessor sym_acc( dst, dst_symtab );
+    string_section_accessor str_acc( dst_strtab );
+    auto                    entry = dst.get_entry();
+    std::cout << entry << std::endl;
+
+    auto sections = utils::get_sections_containing_addr( dst, entry );
+    std::cout << sections.size() << std::endl;
+    auto start_sec = sections.front();
+    for ( int j = 0; j < dst.sections.size(); j++ ) {
+        section* sec = dst.sections[j];
+
+        if ( sec->get_address() == entry ) {
+            utils::Symbol fn_symbol;
+            fn_symbol.value         = 0x0;
+            fn_symbol.name          = "_start";
+            fn_symbol.bind          = STB_GLOBAL;
+            fn_symbol.section_index = sec->get_index();
+            fn_symbol.size          = sec->get_size();
+            fn_symbol.type          = STT_FUNC;
+            fn_symbol.other         = STV_DEFAULT;
+
+            utils::add_symbol( sym_acc, str_acc, fn_symbol );
+        }
+    }
+}
 
 int main( int argc, char** argv )
 {
@@ -341,7 +368,7 @@ int main( int argc, char** argv )
     writer.set_os_abi( reader.get_os_abi() );
     writer.set_type( ET_REL );
     writer.set_machine( reader.get_machine() );
-    writer.set_entry( 0x0 );
+    writer.set_entry( reader.get_entry() );
 
     section* old_symtab_sec = utils::get_sections_by_type( reader, SHT_SYMTAB ).front();
     section* new_strtab_sec = writer.sections.add( ".strtab" );
@@ -359,6 +386,7 @@ int main( int argc, char** argv )
     recreate_functions( reader, writer );
     create_relocs( reader, writer, new_symtab_sec, new_strtab_sec );
     fix_symtab( writer, new_symtab_sec, new_strtab_sec );
+    establish_entry_point( writer, new_symtab_sec, new_strtab_sec );
 
     writer.save( "./result.elf" );
 
