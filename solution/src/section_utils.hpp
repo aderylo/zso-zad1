@@ -13,7 +13,7 @@ struct Section
     Elf_Xword   flags;
     Elf64_Addr  addr;
     Elf_Word    link;
-    Elf_Word info;
+    Elf_Word    info;
     Elf_Xword   addralign;
     Elf_Xword   entsize;
 };
@@ -28,9 +28,23 @@ section* add_section( elfio& elf_file, const Section& sec_hdr )
     psec->set_link( sec_hdr.link );
     psec->set_addr_align( sec_hdr.addralign );
     psec->set_entry_size( sec_hdr.entsize );
-    psec->set_info(sec_hdr.info);
+    psec->set_info( sec_hdr.info );
 
     return psec;
+}
+
+section* add_rel_section( elfio& elf_file, const std::string& name, Elf_Word link, Elf_Word info )
+{
+    Section sec_hdr;
+    sec_hdr.addr      = 0x0;
+    sec_hdr.addralign = 0x4;
+    sec_hdr.entsize   = 0x8;
+    sec_hdr.flags     = SHF_INFO_LINK;
+    sec_hdr.type      = SHT_REL;
+    sec_hdr.name      = name;
+    sec_hdr.link      = link;
+    sec_hdr.info      = info;
+    return add_section( elf_file, sec_hdr );
 }
 
 std::vector<section*> get_sections_by_regex( const elfio& elf_file, const std::string& pattern_str )
@@ -72,6 +86,22 @@ std::vector<section*> get_sections_by_flags( const elfio& elf_file, Elf_Xword fl
         if ( flags == psec->get_flags() ) {
             result.push_back( psec );
         }
+    }
+
+    return result;
+}
+
+std::vector<section*> get_sections_containing_addr( const elfio& elf_file, Elf64_Addr addr )
+{
+    std::vector<section*> result;
+
+    for ( int j = 0; j < elf_file.sections.size(); j++ ) {
+        auto psec  = elf_file.sections[j];
+        auto start = psec->get_address();
+        auto end   = start + psec->get_size();
+
+        if ( start <= addr && addr <= end )
+            result.push_back( psec );
     }
 
     return result;

@@ -18,7 +18,7 @@ struct Symbol
     unsigned char other;
 };
 
-bool add_symbol( symbol_section_accessor& sym_acc,
+Elf_Word add_symbol( symbol_section_accessor& sym_acc,
                  string_section_accessor& str_acc,
                  const Symbol&            symbol )
 {
