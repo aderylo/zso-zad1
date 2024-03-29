@@ -21,17 +21,18 @@ struct Symbol
     Elf_Word __symtab_idx;
 };
 
-Elf_Word add_symbol( symbol_section_accessor& sym_acc,
-                     string_section_accessor& str_acc,
-                     const Symbol&            symbol )
+Symbol
+add_symbol( symbol_section_accessor& sym_acc, string_section_accessor& str_acc, Symbol symbol )
 {
-    return sym_acc.add_symbol( str_acc, symbol.name.c_str(), symbol.value, symbol.size, symbol.bind,
-                               symbol.type, symbol.other, symbol.section_index );
+    symbol.__symtab_idx =
+        sym_acc.add_symbol( str_acc, symbol.name.c_str(), symbol.value, symbol.size, symbol.bind,
+                            symbol.type, symbol.other, symbol.section_index );
+    return symbol;
 }
 
-Elf_Word add_function_symbol( symbol_section_accessor& sym_acc,
-                              string_section_accessor& str_acc,
-                              section*                 fn_section )
+Symbol add_function_symbol( symbol_section_accessor& sym_acc,
+                            string_section_accessor& str_acc,
+                            section*                 fn_section )
 {
     utils::Symbol fn_symbol;
     fn_symbol.value         = 0x0;
@@ -45,10 +46,10 @@ Elf_Word add_function_symbol( symbol_section_accessor& sym_acc,
     return add_symbol( sym_acc, str_acc, fn_symbol );
 }
 
-Elf_Word add_rodata_symbol( symbol_section_accessor& sym_acc,
-                            string_section_accessor& str_acc,
-                            Elf64_Word               original_addr,
-                            section*                 ro_object_section )
+Symbol add_rodata_symbol( symbol_section_accessor& sym_acc,
+                          string_section_accessor& str_acc,
+                          Elf64_Word               original_addr,
+                          section*                 ro_object_section )
 {
     utils::Symbol symbol;
     symbol.value         = 0x0;
@@ -62,10 +63,10 @@ Elf_Word add_rodata_symbol( symbol_section_accessor& sym_acc,
     return add_symbol( sym_acc, str_acc, symbol );
 }
 
-Elf_Word add_bss_symbol( symbol_section_accessor& sym_acc,
-                         string_section_accessor& str_acc,
-                         Elf64_Word               original_addr,
-                         section*                 bss_obj_section )
+Symbol add_bss_symbol( symbol_section_accessor& sym_acc,
+                       string_section_accessor& str_acc,
+                       Elf64_Word               original_addr,
+                       section*                 bss_obj_section )
 {
     utils::Symbol symbol;
     symbol.value         = 0x0;
@@ -79,10 +80,10 @@ Elf_Word add_bss_symbol( symbol_section_accessor& sym_acc,
     return add_symbol( sym_acc, str_acc, symbol );
 }
 
-Elf_Word add_data_symbol( symbol_section_accessor& sym_acc,
-                          string_section_accessor& str_acc,
-                          Elf64_Word               original_addr,
-                          section*                 data_obj_section )
+Symbol add_data_symbol( symbol_section_accessor& sym_acc,
+                        string_section_accessor& str_acc,
+                        Elf64_Word               original_addr,
+                        section*                 data_obj_section )
 {
     utils::Symbol symbol;
     symbol.value         = 0x0;
@@ -147,6 +148,16 @@ std::vector<Symbol> filter_symtab_view_by_regex( const std::vector<Symbol>& symt
     auto nameMatches = [pattern]( Symbol s ) { return ( std::regex_match( s.name, pattern ) ); };
 
     std::copy_if( symtab_view.begin(), symtab_view.end(), std::back_inserter( res ), nameMatches );
+    return res;
+}
+
+std::vector<Symbol> filter_symtab_view_by_contains_addr( const std::vector<Symbol>& symtab_view,
+                                                         Elf64_Addr                 addr )
+{
+    std::vector<Symbol> res;
+    auto contains = [addr]( Symbol s ) { return ( s.value <= addr && addr <= s.value + s.size ); };
+
+    std::copy_if( symtab_view.begin(), symtab_view.end(), std::back_inserter( res ), contains );
     return res;
 }
 

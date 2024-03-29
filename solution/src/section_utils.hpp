@@ -33,6 +33,19 @@ section* add_section( elfio& elf_file, const Section& sec_hdr )
     return psec;
 }
 
+section* add_fun_section(elfio & elf_file, const std::string& name){
+        Section sec_hdr;
+    sec_hdr.addr      = 0x0;
+    sec_hdr.addralign = 0x1;
+    sec_hdr.entsize   = 0x0;
+    sec_hdr.flags     = ( SHF_ALLOC | SHF_EXECINSTR );;
+    sec_hdr.type      = SHT_PROGBITS;
+    sec_hdr.name      = name;
+    sec_hdr.link      = 0x0;
+    sec_hdr.info      = 0x0;
+    return add_section( elf_file, sec_hdr );
+}
+
 section* add_rel_section( elfio& elf_file, const std::string& name, Elf_Word link, Elf_Word info )
 {
     Section sec_hdr;
@@ -44,6 +57,51 @@ section* add_rel_section( elfio& elf_file, const std::string& name, Elf_Word lin
     sec_hdr.name      = name;
     sec_hdr.link      = link;
     sec_hdr.info      = info;
+    return add_section( elf_file, sec_hdr );
+}
+
+section* add_bss_section( elfio& elf_file, Elf64_Word addr )
+{
+    Section sec_hdr;
+    sec_hdr.addr      = 0x0;
+    sec_hdr.addralign = 0x4;
+    sec_hdr.entsize   = 0x0;
+    sec_hdr.flags     = ( SHF_WRITE | SHF_ALLOC );
+    sec_hdr.info      = 0x0;
+    sec_hdr.link      = 0x0;
+    sec_hdr.name      = ".bss." + std::to_string( addr ) + "B";
+    sec_hdr.type      = SHT_NOBITS;
+
+    return add_section( elf_file, sec_hdr );
+}
+
+section* add_data_section( elfio& elf_file, Elf64_Word addr )
+{
+    Section sec_hdr;
+    sec_hdr.addr      = 0x0;
+    sec_hdr.addralign = 0x1;
+    sec_hdr.entsize   = 0x0;
+    sec_hdr.flags     = ( SHF_WRITE | SHF_ALLOC );
+    sec_hdr.info      = 0x0;
+    sec_hdr.link      = 0x0;
+    sec_hdr.name      = ".data." + std::to_string( addr ) + "D";
+    sec_hdr.type      = SHT_PROGBITS;
+
+    return add_section( elf_file, sec_hdr );
+}
+
+section* add_rodata_section( elfio& elf_file, Elf64_Word addr )
+{
+    Section sec_hdr;
+    sec_hdr.addr      = 0x0;
+    sec_hdr.addralign = 0x4;
+    sec_hdr.entsize   = 0x0;
+    sec_hdr.flags     = ( SHF_ALLOC );
+    sec_hdr.info      = 0x0;
+    sec_hdr.link      = 0x0;
+    sec_hdr.name      = ".rodata." + std::to_string( addr ) + "r";
+    sec_hdr.type      = SHT_PROGBITS;
+
     return add_section( elf_file, sec_hdr );
 }
 
