@@ -20,10 +20,17 @@ utils::Relocation recreate_relocation_entry( elfio&                     new_file
                                              std::vector<utils::Symbol> org_symtab_view,
                                              utils::Relocation          org_rel )
 {
-    utils::Symbol       org_sym      = org_symtab_view[org_rel.symbol];
-    Elf64_Addr          org_obj_addr = org_sym.value;
-    Elf_Xword           org_obj_size = org_sym.size;
-    utils::PointerClass obj_class    = utils::classify_pointer( org_mem_layout, org_obj_addr );
+    utils::Symbol org_sym      = org_symtab_view[org_rel.symbol];
+    Elf32_Addr    org_obj_addr = org_sym.value;
+    Elf_Xword     org_obj_size = org_sym.size;
+    Elf_Sword     addend       = utils::resolve_rel_addend( org_file, org_rel.offset );
+
+    // -- adjust addend, in exec file bytes at rel.offset is actual symbol value
+    addend -= org_obj_addr;
+    org_obj_addr += addend;
+
+    utils::PointerClass obj_class = utils::classify_pointer( org_mem_layout, org_obj_addr );
+
     // -- sometimes relocations do not point to objects but sections so grab obj size;
     if ( org_obj_size == 0 ) {
         for ( auto sym : org_symtab_view ) {

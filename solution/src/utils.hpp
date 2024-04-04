@@ -211,16 +211,18 @@ const char* get_data_by_offset( const elfio& file, Elf64_Off offset )
     return result;
 }
 
-uint32_t resolve_rel_addend( const elfio& file, Elf64_Off addr )
+int32_t resolve_rel_addend( const elfio& file, Elf64_Off addr )
 {
-    uint32_t addend = 0;
+    int32_t addend = 0;
     for ( int j = 0; j < file.segments.size(); j++ ) {
         auto seg = file.segments[j];
         if ( seg->get_virtual_address() <= addr &&
              addr <= seg->get_virtual_address() + seg->get_memory_size() &&
-             seg->get_memory_size() > 0 ) {
-            memcpy( &addend, seg->get_data() + ( addr - seg->get_virtual_address() ),
-                    sizeof( addend ) );
+             seg->get_file_size() > 0 ) {
+
+            size_t      offset_into_seg = addr - seg->get_virtual_address();
+            const char* data            = seg->get_data() + offset_into_seg;
+            memcpy( &addend, data, sizeof( addend ) );
         }
     }
 
