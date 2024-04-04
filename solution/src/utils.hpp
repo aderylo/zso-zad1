@@ -1,3 +1,6 @@
+#ifndef UTILS_HPP
+#define UTILS_HPP
+
 #include <iostream>
 #include <elfio/elfio.hpp>
 #include <set>
@@ -196,3 +199,5 @@ PointerClass classify_pointer( ElfMemoryLayout layout, Elf64_Addr addr )
 }
 
 } // namespace utils
+
+#endif // UTILS_HPP

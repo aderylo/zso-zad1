@@ -5,6 +5,7 @@
 #include <section_utils.hpp>
 #include <symbol_utils.hpp>
 #include <relocation_utils.hpp>
+#include <symbolize.hpp>
 #include <algorithm>
 #include <utils.hpp>
 #include <exception>
@@ -113,129 +114,6 @@ bool recreate_functions( const elfio& src, elfio& dst, section* dst_symtab, sect
     return true;
 }
 
-std::vector<utils::Relocation>
-create_rel_tab_for_fn( elfio&                         file,
-                       symbol_section_accessor&       symtab_acc,
-                       string_section_accessor&       strtab_acc,
-                       utils::ElfMemoryLayout         mem_layout,
-                       std::vector<utils::Relocation> original_relocs,
-                       std::vector<utils::Symbol>     original_symbols,
-                       section*                       fn_sec )
-{
-    Elf64_Addr                     fn_addr = fn_sec->get_address();
-    Elf_Xword                      fn_size = fn_sec->get_size();
-    std::vector<utils::Relocation> new_relocs;
-
-    for ( auto org_rel : original_relocs ) {
-        if ( !( fn_addr <= org_rel.offset && org_rel.offset <= fn_addr + fn_size ) )
-            continue;
-
-        auto                org_sym   = original_symbols[org_rel.symbol];
-        Elf64_Addr          obj_addr  = org_sym.value;
-        Elf_Xword           obj_size  = org_sym.size;
-        utils::PointerClass obj_class = utils::classify_pointer( mem_layout, obj_addr );
-
-        auto current_symtab_view = utils::get_symtab_view( symtab_acc );
-        auto existing_sym =
-            utils::filter_symtab_view_by_contains_addr( current_symtab_view, obj_addr );
-
-        if ( obj_class == utils::TEXT ) {
-            if ( existing_sym.empty() )
-                std::cerr << "Funcitons ought to have symbols beforehand!";
-            else {
-                new_relocs.push_back( utils::Relocation( obj_addr - existing_sym.at( 0 ).value,
-                                                         existing_sym.front().__symtab_idx,
-                                                         org_rel.type, 0x0 ) );
-            }
-        }
-        else if ( obj_class == utils::RODATA ) {
-            if ( existing_sym.empty() ) {
-                auto new_obj_sec = utils::add_rodata_section( file, obj_addr );
-                // need: offset to an object;
-                // new_obj_sec.set_data()
-                auto new_obj_sym =
-                    utils::add_rodata_symbol( symtab_acc, strtab_acc, obj_addr, new_obj_sec );
-                existing_sym.push_back( new_obj_sym );
-            }
-
-            utils::Relocation new_rel_entry( obj_addr - existing_sym.front().value,
-                                             existing_sym.front().__symtab_idx, org_rel.type, 0x0 );
-            new_relocs.push_back( new_rel_entry );
-        }
-        else if ( obj_class == utils::GOT ) {
-            // idk
-        }
-        else if ( obj_class == utils::DATA ) {
-            if ( existing_sym.empty() ) {
-                auto new_obj_sec = utils::add_data_section( file, obj_addr );
-                auto new_obj_sym =
-                    utils::add_data_symbol( symtab_acc, strtab_acc, obj_addr, new_obj_sec );
-                existing_sym.push_back( new_obj_sym );
-            }
-
-            utils::Relocation new_rel_entry( obj_addr - existing_sym.front().value,
-                                             existing_sym.front().__symtab_idx, org_rel.type, 0x0 );
-            new_relocs.push_back( new_rel_entry );
-        }
-        else if ( obj_class == utils::BSS ) {
-            if ( existing_sym.empty() ) {
-                auto new_obj_sec = utils::add_bss_section( file, obj_addr );
-                auto new_obj_sym =
-                    utils::add_bss_symbol( symtab_acc, strtab_acc, obj_addr, new_obj_sec );
-                existing_sym.push_back( new_obj_sym );
-            }
-
-            utils::Relocation new_rel_entry( obj_addr - existing_sym.front().value,
-                                             existing_sym.front().__symtab_idx, org_rel.type, 0x0 );
-            new_relocs.push_back( new_rel_entry );
-        }
-    }
-
-    return new_relocs;
-}
-
-void create_relocs( const elfio&             src,
-                    elfio&                   dst,
-                    section*                 sym_sec,
-                    section*                 str_sec,
-                    symbol_section_accessor& symtab_acc,
-                    string_section_accessor& strtab_acc )
-{
-    auto fn_sections = utils::get_sections_by_flags( dst, SHF_ALLOC | SHF_EXECINSTR );
-
-    // --- syms from original file
-    section*                   src_sym_sec = utils::get_sections_by_type( src, SHT_SYMTAB ).front();
-    symbol_section_accessor    src_sym_acc( src, src_sym_sec );
-    std::vector<utils::Symbol> src_sym_view = utils::get_symtab_view( src_sym_acc );
-
-    // --- rels from original file
-    std::vector<utils::Relocation> src_rel_view;
-    std::vector<section*>          src_rel_secs = utils::get_sections_by_type( src, SHT_REL );
-    for ( auto src_rel_sec : src_rel_secs ) {
-        auto acc = relocation_section_accessor( src, src_rel_sec );
-        auto tmp = utils::get_reltab_view( acc );
-        src_rel_view.insert( src_rel_view.end(), tmp.begin(), tmp.end() );
-    }
-
-    // --- create memory layout
-    auto memory_layout = utils::reconstructMemoryLayout( src );
-
-    // --- create relocs for functions
-    for ( section* fn_sec : fn_sections ) {
-        auto rel_tab_view = create_rel_tab_for_fn( dst, symtab_acc, strtab_acc, memory_layout,
-                                                   src_rel_view, src_sym_view, fn_sec );
-
-        if ( !rel_tab_view.empty() ) {
-            auto rel_tab_sec = utils::add_rel_section( dst, ".rel" + fn_sec->get_name(),
-                                                       sym_sec->get_index(), fn_sec->get_index() );
-            relocation_section_accessor rel_tab_acc( dst, rel_tab_sec );
-            for ( auto rel_entry : rel_tab_view ) {
-                utils::add_rel_entry( rel_tab_acc, rel_entry );
-            }
-        }
-    }
-}
-
 void fix_symtab( elfio& dst, section* dst_symtab, section* dst_strtab )
 {
     symbol_section_accessor accessor( dst, dst_symtab );
@@ -266,10 +144,8 @@ void establish_entry_point( elfio& dst, section* dst_symtab, section* dst_strtab
     symbol_section_accessor sym_acc( dst, dst_symtab );
     string_section_accessor str_acc( dst_strtab );
     auto                    entry = dst.get_entry();
-    std::cout << entry << std::endl;
 
-    auto sections = utils::get_sections_containing_addr( dst, entry );
-    std::cout << sections.size() << std::endl;
+    auto sections  = utils::get_sections_containing_addr( dst, entry );
     auto start_sec = sections.front();
     for ( int j = 0; j < dst.sections.size(); j++ ) {
         section* sec = dst.sections[j];
@@ -326,7 +202,7 @@ int main( int argc, char** argv )
     string_section_accessor new_strings( new_strtab_sec );
 
     recreate_functions( reader, writer, new_symtab_sec, new_strtab_sec );
-    create_relocs( reader, writer, new_symtab_sec, new_strtab_sec, new_symbols, new_strings );
+    recreate_relocations( writer, reader, new_symtab_sec, new_strtab_sec );
     fix_symtab( writer, new_symtab_sec, new_strtab_sec );
     establish_entry_point( writer, new_symtab_sec, new_strtab_sec );
 

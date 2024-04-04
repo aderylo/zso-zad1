@@ -1,3 +1,6 @@
+#ifndef SECTION_UTILS_HPP
+#define SECTION_UTILS_HPP
+
 #include <regex>
 #include <string>
 #include <elfio/elfio.hpp>
@@ -182,3 +185,5 @@ void configure_section_header( section*   section,
 }
 
 } // namespace utils
+
+#endif // SECTION_UTILS_HPP
