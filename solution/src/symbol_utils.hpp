@@ -55,7 +55,7 @@ Symbol add_rodata_symbol( symbol_section_accessor& sym_acc,
                           section*                 ro_object_section )
 {
     utils::Symbol symbol;
-    symbol.value         = 0x0;
+    symbol.value         = original_addr;
     symbol.name          = std::to_string( original_addr ) + "r";
     symbol.bind          = STB_LOCAL;
     symbol.section_index = ro_object_section->get_index();
@@ -72,7 +72,7 @@ Symbol add_bss_symbol( symbol_section_accessor& sym_acc,
                        section*                 bss_obj_section )
 {
     utils::Symbol symbol;
-    symbol.value         = 0x0;
+    symbol.value         = original_addr;
     symbol.name          = std::to_string( original_addr ) + "B";
     symbol.bind          = STB_GLOBAL;
     symbol.section_index = bss_obj_section->get_index();
@@ -89,7 +89,7 @@ Symbol add_data_symbol( symbol_section_accessor& sym_acc,
                         section*                 data_obj_section )
 {
     utils::Symbol symbol;
-    symbol.value         = 0x0;
+    symbol.value         = original_addr;
     symbol.name          = std::to_string( original_addr ) + "d";
     symbol.bind          = STB_LOCAL;
     symbol.section_index = data_obj_section->get_index();
@@ -154,11 +154,14 @@ std::vector<Symbol> filter_symtab_view_by_regex( const std::vector<Symbol>& symt
     return res;
 }
 
+/**
+ * Get symbols of objects that contain given address. I.e. address in [s.value; s.value + s.size)
+*/
 std::vector<Symbol> filter_symtab_view_by_contains_addr( const std::vector<Symbol>& symtab_view,
                                                          Elf64_Addr                 addr )
 {
     std::vector<Symbol> res;
-    auto contains = [addr]( Symbol s ) { return ( s.value <= addr && addr <= s.value + s.size ); };
+    auto contains = [addr]( Symbol s ) { return ( s.value <= addr && addr < s.value + s.size ); };
 
     std::copy_if( symtab_view.begin(), symtab_view.end(), std::back_inserter( res ), contains );
     return res;
