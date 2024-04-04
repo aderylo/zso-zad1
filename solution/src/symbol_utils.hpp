@@ -1,3 +1,6 @@
+#ifndef SYMBOL_UTILS_HPP
+#define SYMBOL_UTILS_HPP
+
 #include <iostream>
 #include <elfio/elfio.hpp>
 #include <set>
@@ -35,7 +38,7 @@ Symbol add_function_symbol( symbol_section_accessor& sym_acc,
                             section*                 fn_section )
 {
     utils::Symbol fn_symbol;
-    fn_symbol.value         = 0x0;
+    fn_symbol.value         = fn_section->get_address();
     fn_symbol.name          = fn_section->get_name();
     fn_symbol.bind          = STB_GLOBAL;
     fn_symbol.section_index = fn_section->get_index();
@@ -179,3 +182,5 @@ std::vector<Symbol> get_symtab_view_in_range( const symbol_section_accessor& acc
 }
 
 } // namespace utils
+
+#endif // SYMBOL_UTILS_HPP

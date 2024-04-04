@@ -1,3 +1,6 @@
+#ifndef RELOCATION_UTILS_HPP
+#define RELOCATION_UTILS_HPP
+
 #include <iostream>
 #include <elfio/elfio.hpp>
 #include <set>
@@ -54,3 +57,5 @@ std::vector<Relocation> get_reltab_view( const relocation_section_accessor& acce
 }
 
 } // namespace utils
+
+#endif // RELOCATION_UTILS_HPP
