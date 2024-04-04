@@ -41,8 +41,9 @@ std::string formatTo08x( int number )
 
 struct ElfSectionLayout
 {
-    Elf64_Addr addr;
-    Elf_Xword  size;
+    Elf64_Addr  addr;
+    Elf_Xword   size;
+    const char* data;
 };
 
 struct ElfMemoryLayout
@@ -60,67 +61,87 @@ ElfMemoryLayout reconstructMemoryLayout( const elfio& elf_file )
     ElfMemoryLayout       layout;
     std::vector<section*> sections;
     Elf64_Addr            addr, size;
+    const char*           data_ptr;
 
     // asuming file has section table
     // -- TEXT:
     addr     = SIZE_MAX;
     size     = 0;
     sections = utils::get_sections_by_flags( elf_file, SHF_EXECINSTR | SHF_ALLOC );
-    for ( const auto& exec_sec : sections ) {
-        addr = std::min( addr, exec_sec->get_address() );
-        size += exec_sec->get_size();
+    for ( const auto& sec : sections ) {
+        if ( addr > sec->get_address() ) {
+            addr     = sec->get_address();
+            data_ptr = sec->get_data();
+        }
+        size += sec->get_size();
     }
-    layout.text = { addr, size };
+    layout.text = { addr, size, data_ptr };
 
     // -- RODATA (assuming .data.rel.ro is .ro)
     addr     = SIZE_MAX;
     size     = 0;
-    sections = utils::get_sections_by_regex( elf_file, ".*\\.ro.*" );
+    sections = utils::get_sections_by_regex( elf_file, "^(?!.*rel).*\\.ro.*" );
     for ( const auto& sec : sections ) {
-        addr = std::min( addr, sec->get_address() );
+        if ( addr > sec->get_address() ) {
+            addr     = sec->get_address();
+            data_ptr = sec->get_data();
+        }
         size += sec->get_size();
     }
-    layout.rodata = { addr, size };
+    layout.rodata = { addr, size, data_ptr };
 
     // -- GOT
     addr     = SIZE_MAX;
     size     = 0;
-    sections = utils::get_sections_by_regex( elf_file, ".*\\.got.*" );
+    sections = utils::get_sections_by_regex( elf_file, "^(?!.*rel).*\\.got.*" );
     for ( const auto& sec : sections ) {
-        addr = std::min( addr, sec->get_address() );
+        if ( addr > sec->get_address() ) {
+            addr     = sec->get_address();
+            data_ptr = sec->get_data();
+        }
         size += sec->get_size();
     }
-    layout.got = { addr, size };
+    layout.got = { addr, size, data_ptr };
 
     // -- BSS
     addr     = SIZE_MAX;
     size     = 0;
-    sections = utils::get_sections_by_regex( elf_file, ".*\\.bss.*" );
+    sections = utils::get_sections_by_regex( elf_file, "^(?!.*rel).*\\.bss.*" );
     for ( const auto& sec : sections ) {
-        addr = std::min( addr, sec->get_address() );
+        if ( addr > sec->get_address() ) {
+            addr     = sec->get_address();
+            data_ptr = sec->get_data();
+        }
         size += sec->get_size();
     }
-    layout.bss = { addr, size };
+    layout.bss = { addr, size, data_ptr };
 
     // -- STACK
     addr     = SIZE_MAX;
     size     = 0;
-    sections = utils::get_sections_by_regex( elf_file, ".*\\.stack.*" );
+    sections = utils::get_sections_by_regex( elf_file, "^(?!.*rel).*\\.stack.*" );
     for ( const auto& sec : sections ) {
-        addr = std::min( addr, sec->get_address() );
+        if ( addr > sec->get_address() ) {
+            addr     = sec->get_address();
+            data_ptr = sec->get_data();
+        }
         size += sec->get_size();
     }
-    layout.stack = { addr, size };
+    layout.stack = { addr, size, data_ptr };
 
     // -- DATA
     addr     = SIZE_MAX;
     size     = 0;
-    sections = utils::get_sections_by_regex( elf_file, ".*\\.data.*" );
+    sections = utils::get_sections_by_regex( elf_file, "^(?!.*rel).*\\.data.*" );
     for ( const auto& sec : sections ) {
-        addr = std::min( addr, sec->get_address() );
+        std::cout << sec->get_name() << std::endl;
+        if ( addr > sec->get_address() ) {
+            addr     = sec->get_address();
+            data_ptr = sec->get_data();
+        }
         size += sec->get_size();
     }
-    layout.data = { addr, size };
+    layout.data = { addr, size, data_ptr };
 
     return layout;
 }
@@ -173,43 +194,5 @@ PointerClass classify_pointer( ElfMemoryLayout layout, Elf64_Addr addr )
 
     return PointerClass::UNCLASSIFIED;
 }
-
-// PointerClass classify_pointer( const elfio& elf_file,
-//                                Elf64_Addr   text_start,
-//                                Elf64_Addr   text_end,
-//                                Elf64_Addr   addr )
-// {
-//     {
-//         for ( int j = 0; j < elf_file.segments.size(); j++ ) {
-//             auto segment = elf_file.segments[j];
-//             auto start   = segment->get_virtual_address();
-//             auto end     = start + segment->get_memory_size();
-
-//             if ( start == 0 || segment->get_memory_size() == 0 )
-//                 continue; // empty or undefined segment
-
-//             if ( start <= addr && addr <= end ) {
-//                 // @TODO: implement point scoring system instead of branching logic
-
-//                 if ( j == 0 ) {
-//                     if ( text_start <= addr && addr < text_end )
-//                         return TEXT;
-//                     else if ( addr == text_end )
-//                         return TEXT; // that will depend on the instruction before (call/jump vs mov/sub/..)
-//                     else
-//                         return RODATA_OR_GOT;
-//                 }
-
-//                 if ( j == 1 && segment->get_memory_size() > 0 && segment->get_file_size() == 0 )
-//                     return BSS_OR_STACK;
-
-//                 if ( j == 2 )
-//                     return DATA;
-//             }
-//         }
-
-//         return UNCLASSIFIED;
-//     }
-// }
 
 } // namespace utils
