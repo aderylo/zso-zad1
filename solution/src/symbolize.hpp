@@ -20,14 +20,28 @@ utils::Relocation recreate_relocation_entry( elfio&                     new_file
                                              std::vector<utils::Symbol> org_symtab_view,
                                              utils::Relocation          org_rel )
 {
+    print( "REL_TYPE: " + std::to_string( org_rel.type ) + "\n" );
+
     utils::Symbol org_sym      = org_symtab_view[org_rel.symbol];
     Elf32_Addr    org_obj_addr = org_sym.value;
     Elf_Xword     org_obj_size = org_sym.size;
     Elf_Sword     addend       = utils::resolve_rel_addend( org_file, org_rel.offset );
 
+    std::cout << "sym val: " << std::hex << org_obj_addr << std::endl;
+    std::cout << "bytes at off: " << std::hex << addend << std::endl;
+    std::cout << "bytes at off: " << std::dec << addend << std::endl;
+
     // -- adjust addend, in exec file bytes at rel.offset is actual symbol value
     addend -= org_obj_addr;
     org_obj_addr += addend;
+
+    std::cout << "ADDEND: " << std::dec << addend << std::endl;
+    std::cout << "Adjusted addr: " << std::hex << org_obj_addr << std::endl;
+
+    if ( org_rel.type == R_386_PC32 ) { // S + A - PC
+        // cheating I know where it points
+        org_obj_addr = org_sym.value;
+    }
 
     utils::PointerClass obj_class = utils::classify_pointer( org_mem_layout, org_obj_addr );
 
@@ -146,8 +160,8 @@ std::vector<utils::Relocation> recreate_reltab( elfio&                         n
         if ( !( fn_addr <= org_rel.offset && org_rel.offset <= fn_addr + fn_size ) )
             continue;
 
-        if ( org_rel.type != R_386_32 )
-            continue;
+        // if ( org_rel.type != R_386_32 )
+        //     continue;
 
         utils::Relocation new_rel =
             recreate_relocation_entry( new_file, org_file, sec, new_symtab_acc, new_strtab_acc,
