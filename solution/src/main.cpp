@@ -114,11 +114,12 @@ bool recreate_functions( const elfio& src, elfio& dst, section* dst_symtab, sect
     return true;
 }
 
-void fix_symtab( elfio& dst, section* dst_symtab, section* dst_strtab )
+void fvix_symtab( elfio& dst, section* dst_symtab, section* dst_strtab )
 {
     symbol_section_accessor accessor( dst, dst_symtab );
     utils::mapping          symbol_idx_map;
-    for ( int i = 0; i < dst_symtab->get_size(); i++ ) {
+    size_t                  num_of_entries = dst_symtab->get_size() / dst_symtab->get_entry_size();
+    for ( int i = 0; i < num_of_entries; i++ ) {
         symbol_idx_map.insert( i, i );
     }
 
@@ -137,6 +138,27 @@ void fix_symtab( elfio& dst, section* dst_symtab, section* dst_strtab )
             rel_entry.symbol = symbol_idx_map.forward[rel_entry.symbol];
         }
     }
+
+    std::cout << std::dec;
+    std::cout << "forward\n";
+    for ( auto& [key, val] : symbol_idx_map.forward ) {
+        std::cout << "key" << key << " value " << val << std::endl;
+    }
+}
+
+void fix_symtab( elfio& dst, section* dst_symtab )
+{
+    symbol_section_accessor symtab_acc( dst, dst_symtab );
+
+    std::function<void( int, int )> f = [&]( int first, int second ) {
+        std::vector<section*> rel_sections = utils::get_sections_by_type( dst, SHT_REL );
+        for ( auto rel_sec : rel_sections ) {
+            relocation_section_accessor reltab_acc( dst, rel_sec );
+            reltab_acc.swap_symbols( first, second );
+        }
+    };
+
+    symtab_acc.arrange_local_symbols( f );
 }
 
 void establish_entry_point( elfio& dst, section* dst_symtab, section* dst_strtab )
@@ -203,7 +225,7 @@ int main( int argc, char** argv )
 
     recreate_functions( reader, writer, new_symtab_sec, new_strtab_sec );
     recreate_relocations( writer, reader, new_symtab_sec, new_strtab_sec );
-    fix_symtab( writer, new_symtab_sec, new_strtab_sec );
+    fix_symtab( writer, new_symtab_sec );
     establish_entry_point( writer, new_symtab_sec, new_strtab_sec );
 
     writer.save( "./result.elf" );
