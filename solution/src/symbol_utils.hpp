@@ -101,6 +101,22 @@ Symbol add_data_symbol( symbol_section_accessor& sym_acc,
     return add_symbol( sym_acc, str_acc, symbol );
 }
 
+Symbol add_section_symbol( symbol_section_accessor& sym_acc,
+                           string_section_accessor& str_acc,
+                           section*                 sec )
+{
+    utils::Symbol symbol;
+    symbol.value         = 0x0;
+    symbol.name          = "";
+    symbol.bind          = STB_LOCAL;
+    symbol.section_index = sec->get_index();
+    symbol.size          = 0x0;
+    symbol.type          = STT_SECTION;
+    symbol.other         = STV_DEFAULT;
+
+    return add_symbol( sym_acc, str_acc, symbol );
+}
+
 bool get_symbol_by_idx( const symbol_section_accessor& accessor, Elf_Xword index, Symbol& symbol )
 {
     return accessor.get_symbol( index, symbol.name, symbol.value, symbol.size, symbol.bind,

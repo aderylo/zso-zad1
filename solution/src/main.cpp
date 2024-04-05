@@ -165,6 +165,13 @@ void clean_up( elfio& dst, section* dst_symtab, section* dst_strtab )
         section* sec = dst.sections[j];
         sec->set_address( 0x0 );
     }
+
+    // -- add section symbols
+    for ( int j = 0; j < dst.sections.size(); j++ ) {
+        section* sec = dst.sections[j];
+        if ( sec->get_type() == SHT_PROGBITS )
+            utils::add_section_symbol( sym_acc, str_acc, sec );
+    }
 }
 
 int main( int argc, char** argv )
@@ -205,9 +212,9 @@ int main( int argc, char** argv )
 
     recreate_functions( reader, writer, new_symtab_sec, new_strtab_sec );
     recreate_relocations( writer, reader, new_symtab_sec, new_strtab_sec );
-    fix_symtab( writer, new_symtab_sec );
     establish_entry_point( writer, new_symtab_sec, new_strtab_sec );
     clean_up( writer, new_symtab_sec, new_strtab_sec );
+    fix_symtab( writer, new_symtab_sec );
 
     writer.save( "./result.elf" );
 
