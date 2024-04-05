@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <elfio/elfio.hpp>
+#include <utils.hpp>
 #include <set>
 #include <map>
 #include <regex>
@@ -56,7 +57,7 @@ Symbol add_rodata_symbol( symbol_section_accessor& sym_acc,
 {
     utils::Symbol symbol;
     symbol.value         = 0x0;
-    symbol.name          = std::to_string( original_addr ) + "r";
+    symbol.name          = toFormattedHex( original_addr ) + "r";
     symbol.bind          = STB_LOCAL;
     symbol.section_index = ro_object_section->get_index();
     symbol.size          = ro_object_section->get_size();
@@ -73,7 +74,7 @@ Symbol add_bss_symbol( symbol_section_accessor& sym_acc,
 {
     utils::Symbol symbol;
     symbol.value         = 0x0;
-    symbol.name          = std::to_string( original_addr ) + "B";
+    symbol.name          = toFormattedHex( original_addr ) + "B";
     symbol.bind          = STB_GLOBAL;
     symbol.section_index = bss_obj_section->get_index();
     symbol.size          = bss_obj_section->get_size();
@@ -90,7 +91,7 @@ Symbol add_data_symbol( symbol_section_accessor& sym_acc,
 {
     utils::Symbol symbol;
     symbol.value         = 0x0;
-    symbol.name          = std::to_string( original_addr ) + "d";
+    symbol.name          = toFormattedHex( original_addr ) + "d";
     symbol.bind          = STB_LOCAL;
     symbol.section_index = data_obj_section->get_index();
     symbol.size          = data_obj_section->get_size();

@@ -229,6 +229,13 @@ int32_t resolve_rel_addend( const elfio& file, Elf64_Off addr )
     return addend;
 }
 
+std::string toFormattedHex( int number )
+{
+    std::stringstream ss;
+    ss << 'x0' << std::hex << std::setw( 8 ) << std::setfill( '0' ) << number;
+    return ss.str();
+}
+
 } // namespace utils
 
 #endif // UTILS_HPP
