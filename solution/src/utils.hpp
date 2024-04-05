@@ -203,8 +203,9 @@ const char* get_data_by_offset( const elfio& file, Elf64_Off offset )
     const char* result = nullptr;
     for ( int j = 0; j < file.segments.size(); j++ ) {
         auto seg = file.segments[j];
-        if ( seg->get_offset() <= offset && offset <= seg->get_offset() + seg->get_memory_size() ) {
+        if ( seg->get_offset() <= offset && offset < seg->get_offset() + seg->get_memory_size() ) {
             result = seg->get_data() + ( offset - seg->get_offset() );
+            break;
         }
     }
 
@@ -232,7 +233,7 @@ int32_t resolve_rel_addend( const elfio& file, Elf64_Off addr )
 std::string toFormattedHex( int number )
 {
     std::stringstream ss;
-    ss << 'x0' << std::hex << std::setw( 8 ) << std::setfill( '0' ) << number;
+    ss << "x0" << std::hex << std::setw( 8 ) << std::setfill( '0' ) << number;
     return ss.str();
 }
 

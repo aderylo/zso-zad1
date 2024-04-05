@@ -83,8 +83,9 @@ utils::Relocation recreate_relocation_entry( elfio&                     new_file
 
             // link data to section
             size_t offset_into_rodata = org_obj_addr - org_mem_layout.rodata.addr;
-            // new_rodata_sec->set_data( org_mem_layout.rodata.data + offset_into_rodata,
-            //                           org_obj_size );
+            size_t file_offset        = org_mem_layout.rodata.offset + offset_into_rodata;
+            const char* data = utils::get_data_by_offset( org_file, file_offset );
+            new_rodata_sec->set_data( data, org_obj_size );
 
             // add symbol pointing to section representing object
             utils::Symbol new_rodata_sym = utils::add_rodata_symbol( new_symtab_acc, new_strtab_acc,
