@@ -182,17 +182,17 @@ enum PointerClass
 */
 PointerClass classify_pointer( ElfMemoryLayout layout, Elf64_Addr addr )
 {
-    if ( layout.text.addr <= addr && addr <= layout.text.addr + layout.text.size )
+    if ( layout.text.addr <= addr && addr < layout.text.addr + layout.text.size )
         return PointerClass::TEXT;
-    if ( layout.rodata.addr <= addr && addr <= layout.rodata.addr + layout.rodata.size )
+    if ( layout.rodata.addr <= addr && addr < layout.rodata.addr + layout.rodata.size )
         return PointerClass::RODATA;
-    if ( layout.got.addr <= addr && addr <= layout.got.addr + layout.got.size )
+    if ( layout.got.addr <= addr && addr < layout.got.addr + layout.got.size )
         return PointerClass::GOT;
-    if ( layout.bss.addr <= addr && addr <= layout.bss.addr + layout.bss.size )
+    if ( layout.bss.addr <= addr && addr < layout.bss.addr + layout.bss.size )
         return PointerClass::BSS;
-    if ( layout.stack.addr <= addr && addr <= layout.stack.addr + layout.stack.size )
+    if ( layout.stack.addr <= addr && addr < layout.stack.addr + layout.stack.size )
         return PointerClass::STACK;
-    if ( layout.data.addr <= addr && addr <= layout.data.addr + layout.data.size )
+    if ( layout.data.addr <= addr && addr < layout.data.addr + layout.data.size )
         return PointerClass::DATA;
 
     return PointerClass::UNCLASSIFIED;
