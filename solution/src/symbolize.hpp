@@ -55,9 +55,15 @@ utils::Relocation recreate_relocation_entry( elfio&                     new_file
         }
     }
 
-    auto current_symtab_view = utils::get_symtab_view( new_symtab_acc );
-    auto existing_sym =
-        utils::filter_symtab_view_by_contains_addr( current_symtab_view, org_obj_addr );
+    // -- grab any symbols which contain given address
+    auto                       current_symtab_view = utils::get_symtab_view( new_symtab_acc );
+    std::vector<utils::Symbol> existing_sym;
+    for ( auto sym : current_symtab_view ) {
+        section* sec = new_file.sections[sym.section_index];
+        if ( sec->get_address() <= org_obj_addr &&
+             org_obj_addr < sec->get_address() + sec->get_size() )
+            existing_sym.push_back( sym );
+    }
 
     // -- handle relocation for function call
     if ( obj_class == utils::TEXT ) {

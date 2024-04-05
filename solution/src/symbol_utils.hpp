@@ -38,7 +38,7 @@ Symbol add_function_symbol( symbol_section_accessor& sym_acc,
                             section*                 fn_section )
 {
     utils::Symbol fn_symbol;
-    fn_symbol.value         = fn_section->get_address();
+    fn_symbol.value         = 0x0;
     fn_symbol.name          = fn_section->get_name();
     fn_symbol.bind          = STB_GLOBAL;
     fn_symbol.section_index = fn_section->get_index();
@@ -55,7 +55,7 @@ Symbol add_rodata_symbol( symbol_section_accessor& sym_acc,
                           section*                 ro_object_section )
 {
     utils::Symbol symbol;
-    symbol.value         = original_addr;
+    symbol.value         = 0x0;
     symbol.name          = std::to_string( original_addr ) + "r";
     symbol.bind          = STB_LOCAL;
     symbol.section_index = ro_object_section->get_index();
@@ -72,7 +72,7 @@ Symbol add_bss_symbol( symbol_section_accessor& sym_acc,
                        section*                 bss_obj_section )
 {
     utils::Symbol symbol;
-    symbol.value         = original_addr;
+    symbol.value         = 0x0;
     symbol.name          = std::to_string( original_addr ) + "B";
     symbol.bind          = STB_GLOBAL;
     symbol.section_index = bss_obj_section->get_index();
@@ -89,7 +89,7 @@ Symbol add_data_symbol( symbol_section_accessor& sym_acc,
                         section*                 data_obj_section )
 {
     utils::Symbol symbol;
-    symbol.value         = original_addr;
+    symbol.value         = 0x0;
     symbol.name          = std::to_string( original_addr ) + "d";
     symbol.bind          = STB_LOCAL;
     symbol.section_index = data_obj_section->get_index();

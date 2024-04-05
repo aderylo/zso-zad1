@@ -66,7 +66,7 @@ section* add_rel_section( elfio& elf_file, const std::string& name, Elf_Word lin
 section* add_bss_section( elfio& elf_file, Elf64_Word addr )
 {
     Section sec_hdr;
-    sec_hdr.addr      = 0x0;
+    sec_hdr.addr      = addr;
     sec_hdr.addralign = 0x4;
     sec_hdr.entsize   = 0x0;
     sec_hdr.flags     = ( SHF_WRITE | SHF_ALLOC );
@@ -81,7 +81,7 @@ section* add_bss_section( elfio& elf_file, Elf64_Word addr )
 section* add_data_section( elfio& elf_file, Elf64_Word addr )
 {
     Section sec_hdr;
-    sec_hdr.addr      = 0x0;
+    sec_hdr.addr      = addr;
     sec_hdr.addralign = 0x1;
     sec_hdr.entsize   = 0x0;
     sec_hdr.flags     = ( SHF_WRITE | SHF_ALLOC );
@@ -96,7 +96,7 @@ section* add_data_section( elfio& elf_file, Elf64_Word addr )
 section* add_rodata_section( elfio& elf_file, Elf64_Word addr )
 {
     Section sec_hdr;
-    sec_hdr.addr      = 0x0;
+    sec_hdr.addr      = addr;
     sec_hdr.addralign = 0x4;
     sec_hdr.entsize   = 0x0;
     sec_hdr.flags     = ( SHF_ALLOC );

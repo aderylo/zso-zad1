@@ -114,38 +114,6 @@ bool recreate_functions( const elfio& src, elfio& dst, section* dst_symtab, sect
     return true;
 }
 
-void fvix_symtab( elfio& dst, section* dst_symtab, section* dst_strtab )
-{
-    symbol_section_accessor accessor( dst, dst_symtab );
-    utils::mapping          symbol_idx_map;
-    size_t                  num_of_entries = dst_symtab->get_size() / dst_symtab->get_entry_size();
-    for ( int i = 0; i < num_of_entries; i++ ) {
-        symbol_idx_map.insert( i, i );
-    }
-
-    std::function<void( int, int )> f = [&symbol_idx_map]( int first, int second ) {
-        symbol_idx_map.swap_values( first, second );
-    };
-    accessor.arrange_local_symbols( f );
-
-    std::vector<section*> rel_sections = utils::get_sections_by_type( dst, SHT_REL );
-
-    for ( auto rel_sec : rel_sections ) {
-        relocation_section_accessor acc( dst, rel_sec );
-
-        for ( int j = 0; j < acc.get_entries_num(); j++ ) {
-            auto rel_entry   = utils::get_relocation_by_idx( acc, j );
-            rel_entry.symbol = symbol_idx_map.forward[rel_entry.symbol];
-        }
-    }
-
-    std::cout << std::dec;
-    std::cout << "forward\n";
-    for ( auto& [key, val] : symbol_idx_map.forward ) {
-        std::cout << "key" << key << " value " << val << std::endl;
-    }
-}
-
 void fix_symtab( elfio& dst, section* dst_symtab )
 {
     symbol_section_accessor symtab_acc( dst, dst_symtab );
@@ -184,6 +152,18 @@ void establish_entry_point( elfio& dst, section* dst_symtab, section* dst_strtab
 
             utils::add_symbol( sym_acc, str_acc, fn_symbol );
         }
+    }
+}
+
+void clean_up( elfio& dst, section* dst_symtab, section* dst_strtab )
+{
+    symbol_section_accessor sym_acc( dst, dst_symtab );
+    string_section_accessor str_acc( dst_strtab );
+
+    // -- set section addresses to zero since it is a relocatable file
+    for ( int j = 0; j < dst.sections.size(); j++ ) {
+        section* sec = dst.sections[j];
+        sec->set_address( 0x0 );
     }
 }
 
@@ -227,6 +207,7 @@ int main( int argc, char** argv )
     recreate_relocations( writer, reader, new_symtab_sec, new_strtab_sec );
     fix_symtab( writer, new_symtab_sec );
     establish_entry_point( writer, new_symtab_sec, new_strtab_sec );
+    clean_up( writer, new_symtab_sec, new_strtab_sec );
 
     writer.save( "./result.elf" );
 
