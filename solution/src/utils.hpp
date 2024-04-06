@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <elfio/elfio.hpp>
+#include <section_utils.hpp>
 #include <set>
 #include <map>
 #include <iomanip>
