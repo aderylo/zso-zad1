@@ -11,6 +11,29 @@
 
 #define print( x ) std::cout << ( x ) << std::endl
 
+void change_addend( section* sec, Elf32_Off offset, int32_t addend )
+{
+    // Create a vector large enough to hold the section's data
+    std::vector<char> data( sec->get_size() );
+
+    // Copy the section's data into the vector
+    const char* src = sec->get_data();
+    std::memcpy( data.data(), src, sec->get_size() );
+
+    // Ensure the offset is within the bounds of the data
+    if ( offset + sizeof( int32_t ) <= data.size() ) {
+        // Modify the addend at the specified offset
+        *reinterpret_cast<int32_t*>( &data[offset] ) = addend;
+
+        // Update the section with the modified data
+        sec->set_data( data.data(), data.size() );
+    }
+    else {
+        // Handle error: offset out of bounds
+        std::cerr << "Error: Offset is out of bounds." << std::endl;
+    }
+}
+
 utils::Relocation recreate_relocation_entry( elfio&                     new_file,
                                              elfio&                     org_file,
                                              section*                   fn_sec,
@@ -20,30 +43,22 @@ utils::Relocation recreate_relocation_entry( elfio&                     new_file
                                              std::vector<utils::Symbol> org_symtab_view,
                                              utils::Relocation          org_rel )
 {
-    print( "REL_TYPE: " + std::to_string( org_rel.type ) + "\n" );
-
     utils::Symbol org_sym      = org_symtab_view[org_rel.symbol];
     Elf32_Addr    org_obj_addr = org_sym.value;
     Elf_Xword     org_obj_size = org_sym.size;
     Elf_Sword     addend       = utils::resolve_rel_addend( org_file, org_rel.offset );
 
-    std::cout << "sym val: " << std::hex << org_obj_addr << std::endl;
-    std::cout << "bytes at off: " << std::hex << addend << std::endl;
-    std::cout << "bytes at off: " << std::dec << addend << std::endl;
-
-    // -- adjust addend, in exec file bytes at rel.offset is actual symbol value
-    addend -= org_obj_addr;
-    org_obj_addr += addend;
-
-    std::cout << "ADDEND: " << std::dec << addend << std::endl;
-    std::cout << "Adjusted addr: " << std::hex << org_obj_addr << std::endl;
-
-    if ( org_rel.type == R_386_PC32 ) { // S + A - PC
-        // cheating I know where it points
-        org_obj_addr = org_sym.value;
+    if ( org_rel.type == R_386_32 ) { // S + A
+        /** since virtual address is already at the offset in exec files
+        value which would be an addend is actually an address */
+        org_obj_addr = uint32_t( addend );
+        change_addend( fn_sec, org_rel.offset - fn_sec->get_address(), 0x0 );
     }
-
-    utils::PointerClass obj_class = utils::classify_pointer( org_mem_layout, org_obj_addr );
+    if ( org_rel.type == R_386_PC32 ) { // S + A - PC
+        // we know destination of the relative jump
+        org_obj_addr = org_sym.value;
+        change_addend( fn_sec, org_rel.offset - fn_sec->get_address(), -0x4 );
+    }
 
     // -- sometimes relocations do not point to objects but sections so grab obj size;
     if ( org_obj_size == 0 ) {
@@ -65,6 +80,9 @@ utils::Relocation recreate_relocation_entry( elfio&                     new_file
             existing_sym.push_back( sym );
     }
 
+    // -- to which section type does the pointer point?
+    utils::PointerClass obj_class = utils::classify_pointer( org_mem_layout, org_obj_addr );
+
     // -- handle relocation for function call
     if ( obj_class == utils::TEXT ) {
         if ( existing_sym.empty() )
@@ -82,9 +100,9 @@ utils::Relocation recreate_relocation_entry( elfio&                     new_file
             section* new_rodata_sec = utils::add_rodata_section( new_file, org_obj_addr );
 
             // link data to section
-            size_t offset_into_rodata = org_obj_addr - org_mem_layout.rodata.addr;
-            size_t file_offset        = org_mem_layout.rodata.offset + offset_into_rodata;
-            const char* data = utils::get_data_by_offset( org_file, file_offset );
+            size_t      offset_into_rodata = org_obj_addr - org_mem_layout.rodata.addr;
+            size_t      file_offset        = org_mem_layout.rodata.offset + offset_into_rodata;
+            const char* data               = utils::get_data_by_offset( org_file, file_offset );
             new_rodata_sec->set_data( data, org_obj_size );
 
             // add symbol pointing to section representing object
