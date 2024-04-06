@@ -48,6 +48,8 @@ utils::Relocation recreate_relocation_entry( elfio&                     new_file
     Elf_Xword     org_obj_size = org_sym.size;
     Elf_Sword     addend       = utils::resolve_rel_addend( org_file, org_rel.offset );
 
+    std::cout << org_sym.name << std::endl;
+
     if ( org_rel.type == R_386_32 ) { // S + A
         /** since virtual address is already at the offset in exec files
         value which would be an addend is actually an address */
@@ -141,14 +143,16 @@ utils::Relocation recreate_relocation_entry( elfio&                     new_file
     // -- handle ptr to object in DATA
 
     if ( obj_class == utils::DATA ) {
+        print( "hello" );
         if ( existing_sym.empty() ) { // add section (with data) and symbol pointing to it
             // section header
             section* new_data_sec = utils::add_data_section( new_file, org_obj_addr );
 
             // link data to section
-            size_t      offset_into_data = org_obj_addr - org_mem_layout.data.addr;
-            size_t      file_offset      = org_mem_layout.data.offset + offset_into_data;
-            const char* data             = utils::get_data_by_offset( org_file, file_offset );
+            size_t offset_into_data = org_obj_addr - org_mem_layout.data.addr;
+            size_t file_offset      = org_mem_layout.data.offset + offset_into_data;
+            // if there is data then it will be in 3rd segment
+            const char* data = org_file.segments[2]->get_data() + offset_into_data;
             new_data_sec->set_data( data, org_obj_size );
 
             // add symbol pointing to section representing object
